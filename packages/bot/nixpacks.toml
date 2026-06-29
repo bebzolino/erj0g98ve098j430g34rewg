@@ -1,3 +1,8 @@
+providers = ["node", "python"]
+
+[variables]
+NIXPACKS_DEBIAN = "1"
+
 [phases.setup]
 nixPkgs = ["nodejs_20", "python311", "python311Packages.pip"]
 
