@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   Home,
+  Info,
   MessageSquare,
   Plus,
   RefreshCw,
@@ -155,6 +156,10 @@ function toNumber(value: string, fallback = 0) {
   return Number.isFinite(next) ? next : fallback;
 }
 
+function containsLink(value: string) {
+  return /(?:https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/|[a-z0-9-]+\.[a-z]{2,}(?:\/|\b))/i.test(value);
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [config, setConfig] = useState<SystemConfig | null>(null);
@@ -246,6 +251,10 @@ export default function Dashboard() {
   const saveConfig = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!config) return;
+    if (containsLink(config.welcomeMessage || '')) {
+      showError('Welcome Message cannot contain links.');
+      return;
+    }
 
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -384,6 +393,22 @@ export default function Dashboard() {
   const updateConfig = <K extends keyof SystemConfig>(key: K, value: SystemConfig[K]) => {
     setIsEditingConfig(true);
     setConfig((current) => current ? { ...current, [key]: value } : current);
+  };
+
+  const updateWelcomeMessage = (value: string) => {
+    if (containsLink(value)) {
+      showError('Links are not allowed in Welcome Message.');
+      return;
+    }
+    updateConfig('welcomeMessage', value);
+  };
+
+  const blockWelcomePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = event.clipboardData.getData('text');
+    if (containsLink(text)) {
+      event.preventDefault();
+      showError('Links cannot be pasted into Welcome Message.');
+    }
   };
 
   const navItems: Array<{ id: Tab; label: string; icon: React.ElementType }> = [
@@ -641,8 +666,16 @@ export default function Dashboard() {
               ) : (
                 <form className="settings-form" onSubmit={saveConfig}>
                   <ConfigPanel title="Messages" icon={MessageSquare}>
-                    <Field label="Welcome Message">
-                      <textarea value={config.welcomeMessage} onChange={(event) => updateConfig('welcomeMessage', event.target.value)} rows={4} />
+                    <Field
+                      label="Welcome Message"
+                      info="Links are blocked here. Do not include URLs, invites, domains, or clickable addresses."
+                    >
+                      <textarea
+                        value={config.welcomeMessage}
+                        onChange={(event) => updateWelcomeMessage(event.target.value)}
+                        onPaste={blockWelcomePaste}
+                        rows={4}
+                      />
                     </Field>
                     <Field label="Follow-up Message">
                       <textarea value={config.followupMessage} onChange={(event) => updateConfig('followupMessage', event.target.value)} rows={4} />
@@ -1084,11 +1117,19 @@ export default function Dashboard() {
         .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .field label {
-          display: block;
+          display: flex;
+          align-items: center;
+          gap: 7px;
           margin-bottom: 8px;
           color: #a1a1aa;
           font-size: 12px;
           font-weight: 800;
+        }
+        .field-info {
+          width: 17px;
+          height: 17px;
+          color: #d6d6df;
+          flex-shrink: 0;
         }
         .field input, .field textarea, .field select {
           width: 100%;
@@ -1387,10 +1428,17 @@ export default function Dashboard() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (
     <div className="field">
-      <label>{label}</label>
+      <label>
+        {label}
+        {info && (
+          <span className="field-info" aria-label={info} title={info}>
+            <Info size={16} />
+          </span>
+        )}
+      </label>
       {children}
     </div>
   );

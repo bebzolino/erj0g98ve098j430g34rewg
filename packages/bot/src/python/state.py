@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 
 import discord
@@ -27,6 +28,7 @@ from status import (
 from utils import format_delay, parse_timestamp, positive_int, utc_now
 
 MAX_SCHEDULE_AHEAD_SECONDS = 3600
+LINK_PATTERN = re.compile(r"(?:https?://|www\.|discord\.gg/|discord\.com/invite/|[a-z0-9-]+\.[a-z]{2,}(?:/|\b))", re.I)
 
 
 class BotState:
@@ -240,7 +242,12 @@ class BotState:
         if not member or member.get("status") not in {MEMBER_PENDING, MEMBER_FAILED_DM}:
             return False
         config = await self.db.fetch_config()
-        return await self.send_dm(user_id, config.get("welcomeMessage") or "", MEMBER_FIRST_DM_SENT, MEMBER_FAILED_DM, "Initial DM")
+        message = config.get("welcomeMessage") or ""
+        if LINK_PATTERN.search(message):
+            await self.db.update_member_status(user_id, MEMBER_FAILED_DM)
+            await self.db.log("Initial DM blocked: Welcome Message contains a link. Remove the link in Settings.", "error")
+            return False
+        return await self.send_dm(user_id, message, MEMBER_FIRST_DM_SENT, MEMBER_FAILED_DM, "Initial DM")
 
     async def send_followup_dm(self, user_id: str) -> bool:
         member = await self.db.fetch_member(user_id)

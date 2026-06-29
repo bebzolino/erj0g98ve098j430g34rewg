@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma, getOrCreateConfig } from 'shared';
 
+function containsLink(value: string) {
+  return /(?:https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/|[a-z0-9-]+\.[a-z]{2,}(?:\/|\b))/i.test(value);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
@@ -10,6 +14,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const body = req.body;
+      if (containsLink(String(body.welcomeMessage || ''))) {
+        return res.status(400).json({ error: 'Welcome Message cannot contain links' });
+      }
       const config = await prisma.systemConfig.update({
         where: { id: 'default' },
         data: {
