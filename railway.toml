@@ -3,6 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.dashboard"
 
 [deploy]
-startCommand = "npm start -w packages/dashboard"
+startCommand = "npm start -w packages/dashboard -- -p $PORT"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

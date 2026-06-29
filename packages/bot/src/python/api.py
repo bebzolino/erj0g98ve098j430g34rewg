@@ -8,6 +8,13 @@ from status import MEMBER_FAILED_DM, MEMBER_FIRST_DM_SENT
 def create_app(state) -> web.Application:
     app = web.Application()
 
+    async def handle_health(request: web.Request) -> web.Response:
+        return web.json_response({
+            "service": "bot",
+            "status": "ok",
+            "message": "This is the bot API service. Open the dashboard service URL for the web panel.",
+        })
+
     async def handle_api(request: web.Request) -> web.Response:
         try:
             payload = await request.json()
@@ -41,6 +48,8 @@ def create_app(state) -> web.Application:
             return web.json_response({"success": ok}, status=200 if ok else 500)
         return web.json_response({"error": "Unknown action"}, status=400)
 
+    app.router.add_get("/", handle_health)
+    app.router.add_get("/health", handle_health)
     app.router.add_post("/", handle_api)
     return app
 

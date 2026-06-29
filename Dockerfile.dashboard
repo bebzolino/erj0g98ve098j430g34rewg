@@ -19,4 +19,4 @@ COPY packages/dashboard ./packages/dashboard
 RUN npm run db:generate
 RUN npm run build -w packages/dashboard
 EXPOSE 3000
-CMD ["npm", "start", "-w", "packages/dashboard"]
+CMD ["sh", "-c", "npm start -w packages/dashboard -- -p ${PORT:-3000}"]
