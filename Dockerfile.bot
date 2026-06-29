@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY packages/bot/src/python/requirements.txt ./requirements.txt
+RUN python3 -m pip install --no-cache-dir --upgrade pip \
+  && python3 -m pip install --no-cache-dir -r requirements.txt
+
+COPY packages/bot/src/python ./src/python
+
+CMD ["python3", "src/python/outreach_bot.py"]
