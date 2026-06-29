@@ -1,0 +1,112 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model SystemConfig {
+  id                  String   @id @default("default")
+  welcomeMessage      String   @default("Hey! Welcome.\n\nHave you played Crystal PvP before?\n\nReply here if you'd like help getting started.")
+  followupMessage     String   @default("Just checking in!\n\nIf you'd like help getting started, feel free to reply.")
+  initialDelayMinutes Int      @default(15)
+  followupDelayHours  Int      @default(24)
+  enableAi            Boolean  @default(true)
+  confidenceThreshold Float    @default(0.7)
+  webhookUrl          String   @default("")
+  staffRole           String   @default("")
+  typingSimulation    Boolean  @default(true)
+  enableFriendRequests Boolean @default(false)
+  userToken            String   @default("")
+  geminiApiKey        String   @default("")
+  enablePings         Boolean  @default(false)
+  pingChannelId       String   @default("")
+  pingMessage         String   @default("Hey <@{userId}>, just following up — did you get a chance to see the last message?")
+  pingDelayHours      Int      @default(48)
+  captchaSolver       String   @default("")
+  captchaKey          String   @default("")
+  friendRequestDelayMinutes Int  @default(0)
+  typingSpeedMultiplier     Float @default(1.0)
+  capsolverKey          String   @default("")
+  anysolverKey          String   @default("")
+  captchaProxy          String   @default("")
+  botPort               Int      @default(3001)
+  safetyMinInitialDmDelayMinutes Int @default(10)
+  safetyMinFriendRequestDelayMinutes Int @default(30)
+  safetyDmCooldownSeconds Int @default(120)
+  safetyFriendRequestCooldownSeconds Int @default(900)
+  safetyDmCooldownMinMs Int @default(120000)
+  safetyDmCooldownMaxMs Int @default(240000)
+  safetyFriendRequestCooldownMinMs Int @default(900000)
+  safetyFriendRequestCooldownMaxMs Int @default(1800000)
+  safetyFailureCooldownMinutes Int @default(30)
+  safetyMaxDmPerHour Int @default(6)
+  safetyMaxFriendRequestsPerHour Int @default(2)
+  queueScanIntervalSeconds Int @default(60)
+  queueDmSpreadSeconds Int @default(120)
+  queueFriendRequestSpreadSeconds Int @default(900)
+}
+
+model Account {
+  id          String   @id @default(uuid())
+  token       String
+  username    String   @default("")
+  status      String   @default("active") // active, rate_limited, blocked, disabled
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  members     Member[]
+}
+
+model Member {
+  userId          String         @id
+  username        String
+  joinTime        DateTime       @default(now())
+  status          String         @default("pending") // pending, first_dm_sent, replied, second_dm_sent, stopped, opted_out, failed_dm, failed_followup, pinged
+  interestScore   Float?
+  interestLevel   String?        // low, medium, high
+  sentiment       String?        // positive, neutral, negative
+  tags            String?        // JSON stringified array
+  isToxic         Boolean        @default(false)
+  assignedAccountId String?
+  friendRequestStatus String   @default("idle") // idle, pending, sent, failed
+  account         Account?       @relation(fields: [assignedAccountId], references: [id])
+  conversations   Conversation[]
+  notifications   Notification[]
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String
+  member    Member   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  message   String
+  timestamp DateTime @default(now())
+  direction String   // inbound, outbound
+  accountId String?
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  member    Member   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  sentAt    DateTime @default(now())
+  status    String   // pending, sent, failed
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  message   String
+  level     String   @default("info") // info, warn, error, success
+  timestamp DateTime @default(now())
+}
+
+model BlacklistEntry {
+  id        String   @id @default(uuid())
+  type      String   // user, guild
+  value     String
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([type, value])
+}

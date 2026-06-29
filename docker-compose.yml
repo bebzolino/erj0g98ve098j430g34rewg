@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-customer404}
+      POSTGRES_USER: ${POSTGRES_USER:-customer404}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-customer404_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      target: bot
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-customer404}:${POSTGRES_PASSWORD:-customer404_password}@db:5432/${POSTGRES_DB:-customer404}
+      ANYSOLVER_KEY: ${ANYSOLVER_KEY:-}
+      CAPTCHA_PROXY: ${CAPTCHA_PROXY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "until node -e \"require('net').connect(5432, 'db').on('connect', function(){process.exit(0)}).on('error', function(){process.exit(1)})\"; do echo 'Waiting for database TCP...'; sleep 2; done; npm run db:push -w packages/shared && npm start -w packages/bot"]
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-customer404}:${POSTGRES_PASSWORD:-customer404_password}@db:5432/${POSTGRES_DB:-customer404}
+      BOT_URL: http://bot:3001
+      BOT_API_PORT: 3001
+    depends_on:
+      db:
+        condition: service_healthy
+      bot:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

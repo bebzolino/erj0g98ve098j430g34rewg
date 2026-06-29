@@ -1,0 +1,20 @@
+STATUS_ACTIVE = "active"
+STATUS_INVALID = "invalid"
+STATUS_UNAVAILABLE = "unavailable"
+STATUS_RATE_LIMITED = "rate_limited"
+
+MEMBER_PENDING = "pending"
+MEMBER_FIRST_DM_SENT = "first_dm_sent"
+MEMBER_REPLIED = "replied"
+MEMBER_STOPPED = "stopped"
+MEMBER_FAILED_DM = "failed_dm"
+MEMBER_FAILED_FOLLOWUP = "failed_followup"
+MEMBER_PINGED = "pinged"
+
+FRIEND_IDLE = "idle"
+FRIEND_PENDING = "pending"
+FRIEND_SENT = "sent"
+FRIEND_FAILED = "failed"
+
+DIR_INBOUND = "inbound"
+DIR_OUTBOUND = "outbound"

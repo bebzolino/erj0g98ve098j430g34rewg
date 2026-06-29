@@ -1,0 +1,56 @@
+{
+  "notificationQueue": {
+    "contentDelay": {
+      "enabled": true,
+      "baseDelayMs": 1500,
+      "perCharacterMs": 35,
+      "perWordMs": 120,
+      "minDelayMs": 2000,
+      "maxDelayMs": 45000,
+      "jitterMs": {
+        "min": -750,
+        "max": 3000
+      }
+    },
+    "recipientTiming": {
+      "timezoneSource": "recipient.profile.timezone",
+      "fallbackTimezone": "Europe/Warsaw",
+      "quietHours": {
+        "enabled": true,
+        "start": "22:30",
+        "end": "08:00",
+        "deferUntilEnd": true
+      },
+      "activityRules": {
+        "online": {
+          "multiplier": 0.75,
+          "maxExtraDelayMs": 5000
+        },
+        "idle": {
+          "multiplier": 1.25,
+          "maxExtraDelayMs": 15000
+        },
+        "offline": {
+          "multiplier": 2,
+          "maxExtraDelayMs": 300000
+        },
+        "unknown": {
+          "multiplier": 1.5,
+          "maxExtraDelayMs": 120000
+        }
+      },
+      "recentActivityWindowMinutes": 15,
+      "preferRecentActivity": true
+    },
+    "deliveryLimits": {
+      "maxNotificationsPerRecipientPerHour": 4,
+      "minimumGapBetweenNotificationsMs": 180000,
+      "batchSimilarNotifications": true
+    },
+    "scheduler": {
+      "recalculateBeforeSend": true,
+      "dropIfExpired": true,
+      "expiresAfterMs": 86400000
+    }
+  }
+}

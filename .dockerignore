@@ -1,0 +1,20 @@
+node_modules
+packages/*/node_modules
+dist
+packages/*/dist
+.git
+.env
+.env*.local
+.env.dashboard
+.env.bot
+*.log
+tsconfig.tsbuildinfo
+.system_generated
+out
+build
+proxy.txt
+open router.txt
+*.db
+*.sqlite
+*.sqlite3
+packages/bot/legacy-typescript

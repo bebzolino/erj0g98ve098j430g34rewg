@@ -1,0 +1,27 @@
+{
+  "name": "discord-onboarding-system",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/bot",
+    "packages/dashboard"
+  ],
+  "scripts": {
+    "db:generate": "npm run -w packages/shared db:generate",
+    "db:push": "npm run -w packages/shared db:push",
+    "dev:bot": "npm run -w packages/bot dev",
+    "dev:dashboard": "npm run -w packages/dashboard dev",
+    "dev": "concurrently \"npm run dev:bot\" \"npm run dev:dashboard\"",
+    "postinstall": "npm run db:generate",
+    "build": "npm run build --workspaces",
+    "start": "npm start --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "debug": "^4.4.3"
+  }
+}

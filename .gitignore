@@ -1,0 +1,17 @@
+node_modules/
+.next/
+dist/
+.env
+.env*.local
+.env.dashboard
+.env.bot
+*.log
+tsconfig.tsbuildinfo
+.system_generated/
+out/
+build/
+proxy.txt
+open router.txt
+*.db
+*.sqlite
+*.sqlite3

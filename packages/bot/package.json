@@ -1,0 +1,15 @@
+{
+  "name": "bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/python/outreach_bot.py",
+  "scripts": {
+    "build": "npm run build -w shared",
+    "dev": "python src/python/outreach_bot.py",
+    "start": "python3 src/python/outreach_bot.py"
+  },
+  "dependencies": {
+    "shared": "*"
+  }
+}
