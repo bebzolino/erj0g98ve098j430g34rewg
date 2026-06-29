@@ -1,0 +1,22 @@
+FROM node:20-bookworm-slim AS deps
+
+WORKDIR /app
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package*.json ./
+COPY packages/shared/package*.json packages/shared/
+COPY packages/dashboard/package*.json packages/dashboard/
+RUN npm ci --ignore-scripts
+
+FROM node:20-bookworm-slim AS dashboard
+
+ENV NODE_ENV=production
+WORKDIR /app
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+COPY packages/shared ./packages/shared
+COPY packages/dashboard ./packages/dashboard
+RUN npm run db:generate
+RUN npm run build -w packages/dashboard
+EXPOSE 3000
+CMD ["npm", "start", "-w", "packages/dashboard"]
