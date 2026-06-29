@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -11,13 +12,37 @@ from state import BotState
 
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+DATABASE_URL_KEYS = (
+    "DATABASE_URL",
+    "DATABASE_PRIVATE_URL",
+    "POSTGRES_URL",
+    "POSTGRES_PRIVATE_URL",
+)
 
 
 def get_database_url() -> str:
-    value = os.getenv("DATABASE_URL", "").strip()
-    if not value:
-        raise RuntimeError("DATABASE_URL is required.")
-    return value
+    for key in DATABASE_URL_KEYS:
+        value = os.getenv(key, "").strip()
+        if value:
+            logging.info("Using database connection from %s.", key)
+            return value
+
+    host = os.getenv("PGHOST", "").strip()
+    user = os.getenv("PGUSER", "").strip()
+    password = os.getenv("PGPASSWORD", "").strip()
+    database = os.getenv("PGDATABASE", "").strip()
+    port = os.getenv("PGPORT", "5432").strip() or "5432"
+    if host and user and database:
+        auth = quote(user)
+        if password:
+            auth = f"{auth}:{quote(password)}"
+        logging.info("Using database connection from PGHOST/PGUSER/PGDATABASE.")
+        return f"postgresql://{auth}@{host}:{port}/{quote(database)}"
+
+    raise RuntimeError(
+        "Database connection is missing. Set DATABASE_URL on the Railway bot service "
+        "or attach/reference the Railway Postgres database variables."
+    )
 
 
 async def main_async() -> int:
