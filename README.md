@@ -18,6 +18,8 @@ Automated welcome system for Discord servers: friend requests, DMs, AI analysis,
 
 ### 3. Bot Service Env Vars
 
+If Railway asks for a root directory for the bot service, set it to `packages/bot`.
+
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string from step 2 |
