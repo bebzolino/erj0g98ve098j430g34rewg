@@ -3,6 +3,6 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.dashboard"
 
 [deploy]
-startCommand = "npm start -w packages/dashboard"
+startCommand = "npm run db:push && npm start -w packages/dashboard"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
