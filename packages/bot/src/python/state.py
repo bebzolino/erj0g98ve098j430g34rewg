@@ -38,7 +38,7 @@ class BotState:
         self.clients: dict[str, OutreachClient] = {}
         self.primary_account_id: str | None = None
         self.tasks: dict[str, asyncio.Task[None]] = {}
-        self.next_slot_at = {"account_action": 0.0}
+        self.next_slot_at = {"dm": 0.0, "friend_request": 0.0}
 
     def is_primary(self, account_id: str) -> bool:
         return self.primary_account_id == account_id
@@ -151,8 +151,9 @@ class BotState:
         loop = asyncio.get_running_loop()
         base_delay = max(0, delay_seconds)
         earliest = loop.time() + base_delay
-        slot = max(earliest, self.next_slot_at.get("account_action", 0.0))
-        self.next_slot_at["account_action"] = slot + self.spread_seconds(kind)
+        lane = self.queue_lane(kind)
+        slot = max(earliest, self.next_slot_at.get(lane, 0.0))
+        self.next_slot_at[lane] = slot + self.spread_seconds(kind)
         final_delay = max(0, slot - loop.time())
         task = asyncio.create_task(self.run_scheduled(username, user_id, kind, final_delay, callback))
         self.tasks[key] = task
@@ -184,6 +185,11 @@ class BotState:
         if kind == "friend_request":
             return positive_int(self.current_config.get("queueFriendRequestSpreadSeconds"), 900)
         return positive_int(self.current_config.get("queueDmSpreadSeconds"), 120)
+
+    def queue_lane(self, kind: str) -> str:
+        if kind == "friend_request":
+            return "friend_request"
+        return "dm"
 
     def task_label(self, kind: str) -> str:
         labels = {
