@@ -277,13 +277,14 @@ class BotState:
         username: str,
         account_name: str,
     ) -> None:
+        recipient_id = int(user_id)
         guild_id = member.get("guildId")
         if guild_id:
             try:
                 guild = client.get_guild(int(guild_id))
-                guild_member = guild.get_member(int(user_id)) if guild else None
+                guild_member = guild.get_member(recipient_id) if guild else None
                 if not guild_member and guild and hasattr(guild, "fetch_member"):
-                    guild_member = await guild.fetch_member(int(user_id))
+                    guild_member = await guild.fetch_member(recipient_id)
                 if guild_member:
                     await guild_member.send(message)
                     return
@@ -292,8 +293,30 @@ class BotState:
             except discord.HTTPException as exc:
                 await self.db.log(f'{log_label} guild member lookup/send failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
 
+        cached_user = client.get_user(recipient_id)
+        if cached_user:
+            try:
+                await cached_user.send(message)
+                return
+            except discord.Forbidden as exc:
+                await self.db.log(f'{log_label} cached_user.send failed for {username} using account "{account_name}": {exc}', "warn")
+            except discord.HTTPException as exc:
+                await self.db.log(f'{log_label} cached_user.send failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+
+        for guild in client.guilds:
+            cached_member = guild.get_member(recipient_id)
+            if not cached_member:
+                continue
+            try:
+                await cached_member.send(message)
+                return
+            except discord.Forbidden as exc:
+                await self.db.log(f'{log_label} cached guild member.send failed for {username} using account "{account_name}" in guild {guild.id}: {exc}', "warn")
+            except discord.HTTPException as exc:
+                await self.db.log(f'{log_label} cached guild member.send failed for {username} using account "{account_name}" in guild {guild.id}: Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+
         try:
-            recipient = await client.fetch_user(int(user_id))
+            recipient = await client.fetch_user(recipient_id)
         except discord.Forbidden as exc:
             await self.db.log(f'{log_label} fetch_user failed for {username} using account "{account_name}": {exc}', "error")
             raise
