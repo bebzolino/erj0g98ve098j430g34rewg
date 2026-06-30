@@ -243,12 +243,13 @@ class BotState:
             await self.db.log(f"{log_label} failed for {username}: no active Discord account available.", "error")
             return False
         account_id, client = selected
+        account_name = client.account.get("username") or account_id
         try:
             recipient = await client.fetch_user(int(user_id))
-            await recipient.send(message)
+            await self.send_direct_message(recipient, message)
         except discord.Forbidden as exc:
             await self.db.update_member_status(user_id, fail_status)
-            await self.db.log(f"{log_label} failed for {username}: Discord refused this DM for this user. Account stays active. Details: {exc}", "error")
+            await self.db.log(f'{log_label} failed for {username} using account "{account_name}": Discord refused this DM for this user. Account stays active. Details: {exc}', "error")
             return False
         except discord.HTTPException as exc:
             if getattr(exc, "status", None) == 401:
@@ -256,16 +257,27 @@ class BotState:
             elif getattr(exc, "status", None) == 429:
                 await self.db.set_account_status(account_id, STATUS_RATE_LIMITED, "Discord rate limited this account.")
             else:
-                await self.db.log(f"{log_label} failed for {username}: Discord API error {getattr(exc, 'status', 'unknown')} ({exc}).", "error")
+                await self.db.log(f'{log_label} failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc}).', "error")
             await self.db.update_member_status(user_id, fail_status)
             return False
         except Exception as exc:
             await self.db.update_member_status(user_id, fail_status)
-            await self.db.log(f"{log_label} failed for {username}: {exc}", "error")
+            await self.db.log(f'{log_label} failed for {username} using account "{account_name}": {exc}', "error")
             return False
         await self.db.create_conversation(user_id, message, DIR_OUTBOUND, account_id)
         await self.db.update_member_status(user_id, success_status)
         return True
+
+    async def send_direct_message(self, recipient, message: str) -> None:
+        try:
+            await recipient.send(message)
+            return
+        except discord.Forbidden:
+            if not hasattr(recipient, "create_dm"):
+                raise
+
+        channel = await recipient.create_dm()
+        await channel.send(message)
 
     async def send_initial_dm(self, user_id: str) -> bool:
         member = await self.db.fetch_member(user_id)
