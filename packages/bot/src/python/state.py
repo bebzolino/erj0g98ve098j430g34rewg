@@ -245,8 +245,7 @@ class BotState:
         account_id, client = selected
         account_name = client.account.get("username") or account_id
         try:
-            recipient = await client.fetch_user(int(user_id))
-            await self.send_direct_message(recipient, message)
+            await self.send_direct_message(client, user_id, member, message, log_label, username, account_name)
         except discord.Forbidden as exc:
             await self.db.update_member_status(user_id, fail_status)
             await self.db.log(f'{log_label} failed for {username} using account "{account_name}": Discord refused this DM for this user. Account stays active. Details: {exc}', "error")
@@ -268,16 +267,68 @@ class BotState:
         await self.db.update_member_status(user_id, success_status)
         return True
 
-    async def send_direct_message(self, recipient, message: str) -> None:
+    async def send_direct_message(
+        self,
+        client: OutreachClient,
+        user_id: str,
+        member: dict,
+        message: str,
+        log_label: str,
+        username: str,
+        account_name: str,
+    ) -> None:
+        guild_id = member.get("guildId")
+        if guild_id:
+            try:
+                guild = client.get_guild(int(guild_id))
+                guild_member = guild.get_member(int(user_id)) if guild else None
+                if not guild_member and guild and hasattr(guild, "fetch_member"):
+                    guild_member = await guild.fetch_member(int(user_id))
+                if guild_member:
+                    await guild_member.send(message)
+                    return
+            except discord.Forbidden as exc:
+                await self.db.log(f'{log_label} guild_member.send failed for {username} using account "{account_name}": {exc}', "warn")
+            except discord.HTTPException as exc:
+                await self.db.log(f'{log_label} guild member lookup/send failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+
+        try:
+            recipient = await client.fetch_user(int(user_id))
+        except discord.Forbidden as exc:
+            await self.db.log(f'{log_label} fetch_user failed for {username} using account "{account_name}": {exc}', "error")
+            raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'{log_label} fetch_user failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "error")
+            raise
+
         try:
             await recipient.send(message)
             return
-        except discord.Forbidden:
+        except discord.Forbidden as exc:
+            await self.db.log(f'{log_label} recipient.send failed for {username} using account "{account_name}": {exc}', "warn")
             if not hasattr(recipient, "create_dm"):
                 raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'{log_label} recipient.send failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+            raise
 
-        channel = await recipient.create_dm()
-        await channel.send(message)
+        try:
+            channel = await recipient.create_dm()
+        except discord.Forbidden as exc:
+            await self.db.log(f'{log_label} create_dm failed for {username} using account "{account_name}": {exc}', "error")
+            raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'{log_label} create_dm failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "error")
+            raise
+
+        try:
+            await channel.send(message)
+        except discord.Forbidden as exc:
+            await self.db.log(f'{log_label} channel.send failed for {username} using account "{account_name}": {exc}', "error")
+            raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'{log_label} channel.send failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "error")
+            raise
 
     async def send_initial_dm(self, user_id: str) -> bool:
         member = await self.db.fetch_member(user_id)
