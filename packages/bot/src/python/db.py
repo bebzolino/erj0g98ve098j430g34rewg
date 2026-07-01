@@ -79,9 +79,36 @@ class Database:
                         token TEXT NOT NULL,
                         username TEXT NOT NULL DEFAULT '',
                         status TEXT NOT NULL DEFAULT 'active',
+                        "proxyId" TEXT,
                         "lastUsedAt" TIMESTAMPTZ,
                         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "Proxy" (
+                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+                        label TEXT NOT NULL DEFAULT '',
+                        url TEXT NOT NULL,
+                        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute('ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT')
+                cur.execute(
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'Account_proxyId_fkey'
+                        ) THEN
+                            ALTER TABLE "Account"
+                            ADD CONSTRAINT "Account_proxyId_fkey"
+                            FOREIGN KEY ("proxyId") REFERENCES "Proxy"(id)
+                            ON DELETE SET NULL ON UPDATE CASCADE;
+                        END IF;
+                    END $$;
                     """
                 )
                 cur.execute(
@@ -224,7 +251,13 @@ class Database:
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    'SELECT id, token, username, status FROM "Account" WHERE status = ANY(%s) ORDER BY "lastUsedAt" ASC NULLS FIRST, "createdAt" ASC',
+                    """
+                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.label AS "proxyLabel"
+                    FROM "Account" a
+                    LEFT JOIN "Proxy" p ON p.id = a."proxyId"
+                    WHERE a.status = ANY(%s)
+                    ORDER BY a."lastUsedAt" ASC NULLS FIRST, a."createdAt" ASC
+                    """,
                     (list(statuses),),
                 )
                 columns = [desc.name for desc in cur.description]
@@ -236,7 +269,15 @@ class Database:
     def _fetch_account(self, account_id: str) -> dict | None:
         with self.connect() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT id, token, username, status FROM "Account" WHERE id = %s', (account_id,))
+                cur.execute(
+                    """
+                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.label AS "proxyLabel"
+                    FROM "Account" a
+                    LEFT JOIN "Proxy" p ON p.id = a."proxyId"
+                    WHERE a.id = %s
+                    """,
+                    (account_id,),
+                )
                 row = cur.fetchone()
                 if not row:
                     return None

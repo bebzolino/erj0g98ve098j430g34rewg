@@ -55,9 +55,19 @@ model Account {
   token       String
   username    String   @default("")
   status      String   @default("active") // active, rate_limited, blocked, disabled
+  proxyId     String?
   lastUsedAt  DateTime?
   createdAt   DateTime @default(now())
+  proxy        Proxy?   @relation(fields: [proxyId], references: [id], onDelete: SetNull)
   members     Member[]
+}
+
+model Proxy {
+  id        String   @id @default(uuid())
+  label     String   @default("")
+  url       String
+  createdAt DateTime @default(now())
+  accounts  Account[]
 }
 
 model Member {

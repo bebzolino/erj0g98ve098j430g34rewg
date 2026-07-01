@@ -11,9 +11,14 @@ class OutreachClient(discord.Client):
         super().__init__(captcha_handler=solve_captcha_with_anysolver)
         self.account = account
         self.state = state
+        proxy_url = (account.get("proxyUrl") or "").strip()
+        if proxy_url:
+            self.http.proxy = proxy_url
+            self.http.proxy_gateway = True
 
     async def on_ready(self) -> None:
-        await self.state.db.log(f'Logged in as {self.user} (account: {self.account.get("username") or self.account["id"]})', "success")
+        proxy_label = self.account.get("proxyLabel") or self.account.get("proxyId") or "no proxy"
+        await self.state.db.log(f'Logged in as {self.user} (account: {self.account.get("username") or self.account["id"]}, proxy: {proxy_label})', "success")
 
     async def on_member_join(self, member: discord.Member) -> None:
         if not self.state.is_primary(self.account["id"]):

@@ -7,7 +7,30 @@ export const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 async function ensureRuntimeColumns() {
+  await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
   await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE');
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Proxy" (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+      label TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await prisma.$executeRawUnsafe('ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT');
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'Account_proxyId_fkey'
+      ) THEN
+        ALTER TABLE "Account"
+        ADD CONSTRAINT "Account_proxyId_fkey"
+        FOREIGN KEY ("proxyId") REFERENCES "Proxy"(id)
+        ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `);
 }
 
 export async function getOrCreateConfig() {
@@ -21,6 +44,10 @@ export async function getOrCreateConfig() {
   return await prisma.systemConfig.create({
     data: { id: 'default' },
   });
+}
+
+export async function ensureDatabaseShape() {
+  await ensureRuntimeColumns();
 }
 
 export async function logToDb(message: string, level: 'info' | 'warn' | 'error' | 'success' = 'info') {

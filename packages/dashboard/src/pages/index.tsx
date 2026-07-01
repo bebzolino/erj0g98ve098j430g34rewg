@@ -12,9 +12,10 @@ import {
   Shield,
   Trash2,
   Users,
+  Wifi,
 } from 'lucide-react';
 
-type Tab = 'overview' | 'accounts' | 'messages' | 'blacklist' | 'status' | 'settings';
+type Tab = 'overview' | 'accounts' | 'messages' | 'blacklist' | 'proxies' | 'status' | 'settings';
 
 interface SystemConfig {
   welcomeMessage: string;
@@ -88,8 +89,21 @@ interface Account {
   id: string;
   username: string;
   status: string;
+  proxyId?: string | null;
   tokenPreview?: string;
   createdAt: string;
+}
+
+interface ProxyEntry {
+  id: string;
+  label: string;
+  urlPreview: string;
+  createdAt: string;
+}
+
+interface ProxyPayload {
+  proxies: ProxyEntry[];
+  accounts: Pick<Account, 'id' | 'username' | 'proxyId'>[];
 }
 
 interface BlacklistEntry {
@@ -183,6 +197,7 @@ export default function Dashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
+  const [proxies, setProxies] = useState<ProxyEntry[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [statusData, setStatusData] = useState<StatusSnapshot | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -192,6 +207,8 @@ export default function Dashboard() {
   const [blacklistType, setBlacklistType] = useState<BlacklistType>('guild_whitelist');
   const [blacklistValue, setBlacklistValue] = useState('');
   const [blacklistLabel, setBlacklistLabel] = useState('');
+  const [newProxyLabel, setNewProxyLabel] = useState('');
+  const [newProxyUrl, setNewProxyUrl] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [isEditingConfig, setIsEditingConfig] = useState(false);
@@ -218,11 +235,12 @@ export default function Dashboard() {
   }, [accounts, config, members]);
 
   const loadData = async () => {
-    const [configData, membersData, accountsData, blacklistData, logsData, statusSnapshot] = await Promise.all([
+    const [configData, membersData, accountsData, blacklistData, proxyData, logsData, statusSnapshot] = await Promise.all([
       safeFetch<SystemConfig | null>('/api/config', null),
       safeFetch<Member[]>('/api/members', []),
       safeFetch<Account[]>('/api/accounts', []),
       safeFetch<BlacklistEntry[]>('/api/blacklist', []),
+      safeFetch<ProxyPayload>('/api/proxies', { proxies: [], accounts: [] }),
       safeFetch<LogEntry[]>('/api/logs', []),
       safeFetch<StatusSnapshot | null>('/api/status', null),
     ]);
@@ -231,6 +249,7 @@ export default function Dashboard() {
     setMembers(Array.isArray(membersData) ? membersData : []);
     setAccounts(Array.isArray(accountsData) ? accountsData : []);
     setBlacklist(Array.isArray(blacklistData) ? blacklistData : []);
+    setProxies(Array.isArray(proxyData.proxies) ? proxyData.proxies : []);
     setLogs(Array.isArray(logsData) ? logsData : []);
     if (statusSnapshot && !('error' in statusSnapshot)) setStatusData(statusSnapshot);
   };
@@ -376,6 +395,54 @@ export default function Dashboard() {
     showNotice('Access list entry removed');
   };
 
+  const addProxy = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const res = await fetch('/api/proxies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newProxyLabel.trim(), url: newProxyUrl.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      showError(data.error || 'Proxy add failed');
+      return;
+    }
+    setNewProxyLabel('');
+    setNewProxyUrl('');
+    await loadData();
+    showNotice('Proxy added');
+  };
+
+  const updateProxyAccounts = async (proxyId: string, accountIds: string[]) => {
+    const res = await fetch('/api/proxies', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proxyId, accountIds }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      showError(data.error || 'Proxy assignment failed');
+      return;
+    }
+    await loadData();
+    showNotice('Proxy assignments updated');
+  };
+
+  const deleteProxy = async (id: string) => {
+    const res = await fetch('/api/proxies', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      showError(data.error || 'Proxy delete failed');
+      return;
+    }
+    await loadData();
+    showNotice('Proxy removed');
+  };
+
   const clearLogs = async () => {
     const res = await fetch('/api/logs', { method: 'DELETE' });
     const data = await res.json().catch(() => ({}));
@@ -433,6 +500,7 @@ export default function Dashboard() {
     { id: 'accounts', label: 'Accounts', icon: Users },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'blacklist', label: 'Access Lists', icon: Shield },
+    { id: 'proxies', label: 'Proxy Manager', icon: Wifi },
     { id: 'status', label: 'Status', icon: Activity },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -658,6 +726,66 @@ export default function Dashboard() {
                     </button>
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'proxies' && (
+            <section className="view-stack">
+              <form className="panel account-form" onSubmit={addProxy}>
+                <div className="panel-header">
+                  <div>
+                    <h2>Proxy Manager</h2>
+                    <p>Add proxies and assign Discord accounts to them.</p>
+                  </div>
+                  <button className="primary-button" type="submit">
+                    <Plus size={17} />
+                    Add
+                  </button>
+                </div>
+                <div className="form-grid two">
+                  <Field label="Label">
+                    <input value={newProxyLabel} onChange={(event) => setNewProxyLabel(event.target.value)} placeholder="Warsaw proxy" />
+                  </Field>
+                  <Field label="Proxy URL">
+                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder="http://user:pass@host:port" type="password" />
+                  </Field>
+                </div>
+              </form>
+
+              <div className="accounts-grid">
+                {proxies.length === 0 && <div className="panel empty-state">No proxies configured.</div>}
+                {proxies.map((proxy) => {
+                  const assignedIds = accounts.filter((account) => account.proxyId === proxy.id).map((account) => account.id);
+                  return (
+                    <div className="account-card proxy-card" key={proxy.id}>
+                      <div className="avatar">P</div>
+                      <div className="account-body">
+                        <strong>{proxy.label || 'Proxy'}</strong>
+                        <span>{proxy.urlPreview}</span>
+                        <select
+                          multiple
+                          className="proxy-account-select"
+                          value={assignedIds}
+                          onChange={(event) => updateProxyAccounts(
+                            proxy.id,
+                            Array.from(event.currentTarget.selectedOptions).map((option) => option.value),
+                          )}
+                        >
+                          {accounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.username || account.id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="status-pill active">{assignedIds.length} accounts</span>
+                      <button className="danger-button" onClick={() => deleteProxy(proxy.id)} title="Remove proxy">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -1200,6 +1328,20 @@ export default function Dashboard() {
           color: #a1a1aa;
           font-size: 12px;
           font-family: Consolas, monospace;
+        }
+        .proxy-card {
+          align-items: flex-start;
+        }
+        .proxy-account-select {
+          margin-top: 10px;
+          min-height: 98px;
+          width: 100%;
+          border: 1px solid #2b2b31;
+          border-radius: 8px;
+          outline: none;
+          color: #f5f5f5;
+          background: #1a1a1c;
+          padding: 9px;
         }
         .status-pill, .member-status {
           padding: 5px 9px;

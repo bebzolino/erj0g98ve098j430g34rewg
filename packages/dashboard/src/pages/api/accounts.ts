@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from 'shared';
+import { ensureDatabaseShape, prisma } from 'shared';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
+      await ensureDatabaseShape();
       const accounts = await prisma.account.findMany({
         orderBy: { createdAt: 'desc' },
       });
@@ -14,6 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      await ensureDatabaseShape();
       const { token, username } = req.body;
       if (!token) {
         return res.status(400).json({ error: 'Token is required' });
@@ -30,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
+      await ensureDatabaseShape();
       const { id } = req.body;
       if (!id) {
         return res.status(400).json({ error: 'Account ID is required' });

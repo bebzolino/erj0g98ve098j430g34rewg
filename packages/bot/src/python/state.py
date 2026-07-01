@@ -53,13 +53,23 @@ class BotState:
         active_ids = {account["id"] for account in accounts}
         for account_id, client in list(self.clients.items()):
             account = next((row for row in accounts if row["id"] == account_id), None)
-            if account and account.get("token") == client.account.get("token"):
+            if (
+                account
+                and account.get("token") == client.account.get("token")
+                and account.get("proxyId") == client.account.get("proxyId")
+                and account.get("proxyUrl") == client.account.get("proxyUrl")
+            ):
                 continue
             await self.stop_client(account_id, "account was removed, disabled, or its token changed")
 
         for account in accounts:
             existing = self.clients.get(account["id"])
-            if existing and existing.account.get("token") == account.get("token"):
+            if (
+                existing
+                and existing.account.get("token") == account.get("token")
+                and existing.account.get("proxyId") == account.get("proxyId")
+                and existing.account.get("proxyUrl") == account.get("proxyUrl")
+            ):
                 existing.account = account
                 continue
             client = OutreachClient(account, self)
