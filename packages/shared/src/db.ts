@@ -6,7 +6,12 @@ export const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+async function ensureRuntimeColumns() {
+  await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE');
+}
+
 export async function getOrCreateConfig() {
+  await ensureRuntimeColumns();
   const config = await prisma.systemConfig.findUnique({
     where: { id: 'default' },
   });

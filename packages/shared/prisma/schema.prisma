@@ -19,6 +19,7 @@ model SystemConfig {
   staffRole           String   @default("")
   typingSimulation    Boolean  @default(true)
   enableFriendRequests Boolean @default(false)
+  processRejoins       Boolean @default(false)
   userToken            String   @default("")
   geminiApiKey        String   @default("")
   enablePings         Boolean  @default(false)

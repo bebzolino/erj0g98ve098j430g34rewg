@@ -30,8 +30,8 @@ def create_app(state) -> web.Application:
             return web.json_response({"error": "Missing action"}, status=400)
         if action == "join":
             config = await state.db.fetch_config()
-            await state.db.upsert_member_join(user_id, username, bool(config.get("enableFriendRequests")))
-            return web.json_response({"success": True})
+            created = await state.db.upsert_member_join(user_id, username, bool(config.get("enableFriendRequests")), process_rejoins=bool(config.get("processRejoins")))
+            return web.json_response({"success": True, "created": created})
         if action == "reply":
             await state.handle_user_reply(user_id, username, message)
             return web.json_response({"success": True})

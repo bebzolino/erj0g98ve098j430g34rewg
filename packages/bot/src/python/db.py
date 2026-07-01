@@ -39,6 +39,7 @@ class Database:
                         "staffRole" TEXT NOT NULL DEFAULT '',
                         "typingSimulation" BOOLEAN NOT NULL DEFAULT TRUE,
                         "enableFriendRequests" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE,
                         "userToken" TEXT NOT NULL DEFAULT '',
                         "geminiApiKey" TEXT NOT NULL DEFAULT '',
                         "enablePings" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -70,6 +71,7 @@ class Database:
                     )
                     """
                 )
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE')
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS "Account" (
@@ -252,27 +254,48 @@ class Database:
                 cur.execute('UPDATE "Account" SET status = %s WHERE id = %s', (status, account_id))
             conn.commit()
 
-    async def upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool, guild_id: str | None = None) -> None:
-        await self.run(self._upsert_member_join, user_id, username, friend_request_pending, guild_id)
+    async def upsert_member_join(
+        self,
+        user_id: str,
+        username: str,
+        friend_request_pending: bool,
+        guild_id: str | None = None,
+        process_rejoins: bool = False,
+    ) -> bool:
+        return await self.run(self._upsert_member_join, user_id, username, friend_request_pending, guild_id, process_rejoins)
 
-    def _upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool, guild_id: str | None) -> None:
+    def _upsert_member_join(self, user_id: str, username: str, friend_request_pending: bool, guild_id: str | None, process_rejoins: bool) -> bool:
         friend_status = FRIEND_PENDING if friend_request_pending else FRIEND_IDLE
         with self.connect() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO "Member" ("userId", username, "guildId", status, "friendRequestStatus", "joinTime")
-                    VALUES (%s, %s, %s, %s, %s, NOW())
-                    ON CONFLICT ("userId") DO UPDATE
-                    SET username = EXCLUDED.username,
-                        "guildId" = COALESCE(EXCLUDED."guildId", "Member"."guildId"),
-                        status = EXCLUDED.status,
-                        "friendRequestStatus" = EXCLUDED."friendRequestStatus",
-                        "joinTime" = NOW()
-                    """,
-                    (user_id, username, guild_id, MEMBER_PENDING, friend_status),
-                )
+                if process_rejoins:
+                    cur.execute(
+                        """
+                        INSERT INTO "Member" ("userId", username, "guildId", status, "friendRequestStatus", "joinTime")
+                        VALUES (%s, %s, %s, %s, %s, NOW())
+                        ON CONFLICT ("userId") DO UPDATE
+                        SET username = EXCLUDED.username,
+                            "guildId" = COALESCE(EXCLUDED."guildId", "Member"."guildId"),
+                            status = EXCLUDED.status,
+                            "friendRequestStatus" = EXCLUDED."friendRequestStatus",
+                            "joinTime" = NOW()
+                        RETURNING "userId"
+                        """,
+                        (user_id, username, guild_id, MEMBER_PENDING, friend_status),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO "Member" ("userId", username, "guildId", status, "friendRequestStatus", "joinTime")
+                        VALUES (%s, %s, %s, %s, %s, NOW())
+                        ON CONFLICT ("userId") DO NOTHING
+                        RETURNING "userId"
+                        """,
+                        (user_id, username, guild_id, MEMBER_PENDING, friend_status),
+                    )
+                created = cur.fetchone() is not None
             conn.commit()
+            return created
 
     async def fetch_member(self, user_id: str) -> dict | None:
         return await self.run(self._fetch_member, user_id)

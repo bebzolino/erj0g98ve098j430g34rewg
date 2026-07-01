@@ -27,6 +27,7 @@ interface SystemConfig {
   staffRole: string;
   typingSimulation: boolean;
   enableFriendRequests: boolean;
+  processRejoins: boolean;
   enablePings: boolean;
   pingChannelId: string;
   pingMessage: string;
@@ -758,6 +759,7 @@ export default function Dashboard() {
                       <Toggle label="AI classification" checked={config.enableAi} onChange={(value) => updateConfig('enableAi', value)} />
                       <Toggle label="Typing simulation" checked={config.typingSimulation} onChange={(value) => updateConfig('typingSimulation', value)} />
                       <Toggle label="Friend requests" checked={config.enableFriendRequests} onChange={(value) => updateConfig('enableFriendRequests', value)} />
+                      <Toggle label="Process rejoins" checked={config.processRejoins} onChange={(value) => updateConfig('processRejoins', value)} />
                       <Toggle label="Staff pings" checked={config.enablePings} onChange={(value) => updateConfig('enablePings', value)} />
                     </div>
                     <div className="form-grid three">

@@ -30,6 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           staffRole: body.staffRole,
           typingSimulation: Boolean(body.typingSimulation),
           enableFriendRequests: Boolean(body.enableFriendRequests),
+          processRejoins: Boolean(body.processRejoins),
           enablePings: Boolean(body.enablePings),
           pingChannelId: body.pingChannelId,
           pingMessage: body.pingMessage,
