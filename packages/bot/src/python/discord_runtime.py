@@ -32,6 +32,7 @@ class OutreachClient(discord.Client):
         await self.state.db.upsert_member_join(user_id, member.name, bool(config.get("enableFriendRequests")), guild_id)
         await self.state.db.assign_account(user_id, self.account["id"])
         await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
+        self.state.schedule_join_actions(user_id, member.name, config, 0, bool(config.get("enableFriendRequests")))
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or (self.user and message.author.id == self.user.id):

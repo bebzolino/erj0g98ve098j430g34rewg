@@ -139,11 +139,13 @@ class BotState:
                 continue
             join_time = parse_timestamp(member["joinTime"])
             joined_seconds_ago = max(0, (utc_now() - join_time).total_seconds())
-            delay = max(0, self.initial_delay_seconds(config) - joined_seconds_ago)
-            self.schedule_once(user_id, member.get("username") or user_id, "initial_dm", delay, self.send_initial_dm)
-            if member.get("friendRequestStatus") == FRIEND_PENDING:
-                delay = max(0, self.friend_delay_seconds(config) - joined_seconds_ago)
-                self.schedule_once(user_id, member.get("username") or user_id, "friend_request", delay, self.send_friend_request)
+            self.schedule_join_actions(
+                user_id,
+                member.get("username") or user_id,
+                config,
+                joined_seconds_ago,
+                member.get("friendRequestStatus") == FRIEND_PENDING,
+            )
 
         for member in await self.db.members_with_last_outbound(MEMBER_FIRST_DM_SENT):
             if await self.db.has_reply_after(member["userId"], member["lastOutboundAt"]):
@@ -161,6 +163,20 @@ class BotState:
                 if delay > MAX_SCHEDULE_AHEAD_SECONDS:
                     continue
                 self.schedule_once(member["userId"], member.get("username") or member["userId"], "ping_dm", delay, self.send_ping)
+
+    def schedule_join_actions(
+        self,
+        user_id: str,
+        username: str,
+        config: dict,
+        joined_seconds_ago: float = 0,
+        friend_request_pending: bool = False,
+    ) -> None:
+        dm_delay = max(0, self.initial_delay_seconds(config) - joined_seconds_ago)
+        self.schedule_once(user_id, username, "initial_dm", dm_delay, self.send_initial_dm)
+        if friend_request_pending:
+            friend_delay = max(0, self.friend_delay_seconds(config) - joined_seconds_ago)
+            self.schedule_once(user_id, username, "friend_request", friend_delay, self.send_friend_request)
 
     def schedule_once(self, user_id: str, username: str, kind: str, delay_seconds: float, callback) -> None:
         key = f"{user_id}:{kind}"
