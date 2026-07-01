@@ -437,13 +437,16 @@ class BotState:
             await self.db.log(f"Friend request failed for {username}: no active Discord account available.", "error")
             return False
         account_id, client = selected
+        account_name = client.account.get("username") or account_id
+        stage = "fetch_user"
         try:
             recipient = await client.fetch_user(int(user_id))
             if not hasattr(recipient, "send_friend_request"):
                 raise RuntimeError("discord.py-self user object has no send_friend_request method")
+            stage = "send_friend_request"
             await recipient.send_friend_request()
         except discord.Forbidden as exc:
-            await self.db.log(f"Friend request failed for {username}: Discord refused this friend request for this user. Account stays active. Details: {exc}", "error")
+            await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": Discord refused the friend request API for this account/session. DM can still work. Account stays active. Details: {exc}', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         except discord.HTTPException as exc:
@@ -452,11 +455,11 @@ class BotState:
             elif getattr(exc, "status", None) == 429:
                 await self.db.set_account_status(account_id, STATUS_RATE_LIMITED, "Discord rate limited this account.")
             else:
-                await self.db.log(f"Friend request failed for {user_id}: Discord API error {getattr(exc, 'status', 'unknown')} ({exc}).", "error")
+                await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc}).', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         except Exception as exc:
-            await self.db.log(f"Friend request failed for {user_id}: {exc}", "error")
+            await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": {exc}', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         await self.db.update_friend_status(user_id, FRIEND_SENT)
