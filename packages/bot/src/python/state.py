@@ -38,6 +38,7 @@ class BotState:
         self.clients: dict[str, OutreachClient] = {}
         self.primary_account_id: str | None = None
         self.tasks: dict[str, asyncio.Task[None]] = {}
+        self.last_runtime_summary = ""
 
     def is_primary(self, account_id: str) -> bool:
         return self.primary_account_id == account_id
@@ -70,6 +71,7 @@ class BotState:
 
         if self.primary_account_id not in self.clients:
             self.primary_account_id = next(iter(self.clients), None)
+        await self.log_runtime_summary()
 
     async def stop_client(self, account_id: str, reason: str) -> None:
         client = self.clients.pop(account_id, None)
@@ -94,6 +96,23 @@ class BotState:
             status = STATUS_INVALID if "401" in reason or "invalid" in reason.lower() or "token" in reason.lower() else STATUS_UNAVAILABLE
             await self.db.set_account_status(account["id"], status, f"Discord login failed: {reason}")
             self.clients.pop(account["id"], None)
+            if self.primary_account_id == account["id"]:
+                self.primary_account_id = next(iter(self.clients), None)
+            await self.log_runtime_summary()
+
+    async def log_runtime_summary(self) -> None:
+        primary = self.primary_account_id or "none"
+        primary_client = self.clients.get(primary)
+        primary_name = (primary_client.account.get("username") if primary_client else "") or primary
+        allowed_guilds = await self.db.whitelisted_guilds()
+        preview = ", ".join(allowed_guilds[:5]) if allowed_guilds else "none"
+        extra = "" if len(allowed_guilds) <= 5 else f", +{len(allowed_guilds) - 5} more"
+        summary = f'Primary scanner account: "{primary_name}". Allowed guilds: {len(allowed_guilds)} ({preview}{extra}).'
+        if summary == self.last_runtime_summary:
+            return
+        self.last_runtime_summary = summary
+        level = "warn" if not allowed_guilds else "info"
+        await self.db.log(summary, level)
 
     async def account_sync_loop(self) -> None:
         while True:

@@ -203,6 +203,18 @@ class Database:
                 )
                 return int(cur.fetchone()[0]) > 0
 
+    async def whitelisted_guilds(self) -> list[str]:
+        return await self.run(self._whitelisted_guilds)
+
+    def _whitelisted_guilds(self) -> list[str]:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT value FROM "BlacklistEntry" WHERE type = %s ORDER BY "createdAt" ASC',
+                    ("guild_whitelist",),
+                )
+                return [str(row[0]) for row in cur.fetchall()]
+
     async def fetch_accounts(self, statuses: tuple[str, ...]) -> list[dict]:
         return await self.run(self._fetch_accounts, statuses)
 
