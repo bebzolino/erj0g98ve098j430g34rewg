@@ -30,6 +30,8 @@ interface SystemConfig {
   typingSimulation: boolean;
   enableFriendRequests: boolean;
   processRejoins: boolean;
+  rotateDeliveryAccounts: boolean;
+  fixedDeliveryAccountId: string;
   enablePings: boolean;
   pingChannelId: string;
   pingMessage: string;
@@ -948,11 +950,26 @@ export default function Dashboard() {
                       <Toggle label="Typing simulation" checked={config.typingSimulation} onChange={(value) => updateConfig('typingSimulation', value)} />
                       <Toggle label="Friend requests" checked={config.enableFriendRequests} onChange={(value) => updateConfig('enableFriendRequests', value)} />
                       <Toggle label="Process rejoins" checked={config.processRejoins} onChange={(value) => updateConfig('processRejoins', value)} />
+                      <Toggle label="Rotate delivery accounts" checked={config.rotateDeliveryAccounts} onChange={(value) => updateConfig('rotateDeliveryAccounts', value)} />
                       <Toggle label="Staff pings" checked={config.enablePings} onChange={(value) => updateConfig('enablePings', value)} />
                     </div>
                     <div className="form-grid three">
                       <NumberField label="Confidence Threshold" value={config.confidenceThreshold} onChange={(value) => updateConfig('confidenceThreshold', value)} step="0.01" />
                       <NumberField label="Ping Delay (h)" value={config.pingDelayHours} onChange={(value) => updateConfig('pingDelayHours', value)} />
+                      <Field label="Fixed delivery account">
+                        <select
+                          value={config.fixedDeliveryAccountId || ''}
+                          onChange={(event) => updateConfig('fixedDeliveryAccountId', event.target.value)}
+                          disabled={config.rotateDeliveryAccounts}
+                        >
+                          <option value="">Select account</option>
+                          {accounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.username || account.id}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
                       <Field label="Ping Channel ID">
                         <input value={config.pingChannelId || ''} onChange={(event) => updateConfig('pingChannelId', event.target.value)} />
                       </Field>

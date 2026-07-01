@@ -21,6 +21,8 @@ model SystemConfig {
   typingSimulation    Boolean  @default(true)
   enableFriendRequests Boolean @default(false)
   processRejoins       Boolean @default(false)
+  rotateDeliveryAccounts Boolean @default(true)
+  fixedDeliveryAccountId String @default("")
   userToken            String   @default("")
   geminiApiKey        String   @default("")
   enablePings         Boolean  @default(false)

@@ -10,6 +10,8 @@ async function ensureRuntimeColumns() {
   await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
   await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE');
   await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT \'[]\'');
+  await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE');
+  await prisma.$executeRawUnsafe('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT \'\'');
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Proxy" (
       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,

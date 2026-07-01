@@ -41,6 +41,8 @@ class Database:
                         "typingSimulation" BOOLEAN NOT NULL DEFAULT TRUE,
                         "enableFriendRequests" BOOLEAN NOT NULL DEFAULT FALSE,
                         "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE,
+                        "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT '',
                         "userToken" TEXT NOT NULL DEFAULT '',
                         "geminiApiKey" TEXT NOT NULL DEFAULT '',
                         "enablePings" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -74,6 +76,8 @@ class Database:
                 )
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT \'[]\'')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT \'\'')
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS "Account" (
@@ -297,10 +301,23 @@ class Database:
                 cur.execute('UPDATE "Account" SET status = %s WHERE id = %s', (status, account_id))
             conn.commit()
 
-    async def choose_delivery_account(self) -> str | None:
-        return await self.run(self._choose_delivery_account)
+    async def choose_delivery_account(self, config: dict | None = None) -> str | None:
+        return await self.run(self._choose_delivery_account, config or {})
 
-    def _choose_delivery_account(self) -> str | None:
+    def _choose_delivery_account(self, config: dict) -> str | None:
+        if config.get("rotateDeliveryAccounts") is False:
+            account_id = str(config.get("fixedDeliveryAccountId") or "").strip()
+            if not account_id:
+                return None
+            with self.connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('SELECT id FROM "Account" WHERE id = %s AND status = %s LIMIT 1', (account_id, "active"))
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    cur.execute('UPDATE "Account" SET "lastUsedAt" = NOW() WHERE id = %s', (account_id,))
+                conn.commit()
+                return account_id
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(

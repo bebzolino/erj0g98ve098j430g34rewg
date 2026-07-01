@@ -45,6 +45,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           typingSimulation: Boolean(body.typingSimulation),
           enableFriendRequests: Boolean(body.enableFriendRequests),
           processRejoins: Boolean(body.processRejoins),
+          rotateDeliveryAccounts: Boolean(body.rotateDeliveryAccounts),
+          fixedDeliveryAccountId: String(body.fixedDeliveryAccountId || ''),
           enablePings: Boolean(body.enablePings),
           pingChannelId: body.pingChannelId,
           pingMessage: body.pingMessage,

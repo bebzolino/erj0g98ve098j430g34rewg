@@ -242,6 +242,15 @@ class BotState:
         return member
 
     async def choose_account(self, user_id: str) -> tuple[str, OutreachClient] | None:
+        config = await self.db.fetch_config()
+        if config.get("rotateDeliveryAccounts") is False:
+            fixed_account_id = str(config.get("fixedDeliveryAccountId") or "").strip()
+            client = self.clients.get(fixed_account_id)
+            account = await self.db.fetch_account(fixed_account_id) if fixed_account_id else None
+            if client and account and account.get("status") == STATUS_ACTIVE:
+                await self.db.assign_account(user_id, fixed_account_id)
+                return fixed_account_id, client
+            return None
         member = await self.db.fetch_member(user_id)
         assigned = member.get("assignedAccountId") if member else None
         if assigned and assigned in self.clients:
