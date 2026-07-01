@@ -38,7 +38,6 @@ class BotState:
         self.clients: dict[str, OutreachClient] = {}
         self.primary_account_id: str | None = None
         self.tasks: dict[str, asyncio.Task[None]] = {}
-        self.next_slot_at = {"dm": 0.0, "friend_request": 0.0}
 
     def is_primary(self, account_id: str) -> bool:
         return self.primary_account_id == account_id
@@ -148,26 +147,13 @@ class BotState:
         key = f"{user_id}:{kind}"
         if key in self.tasks:
             return
-        loop = asyncio.get_running_loop()
-        base_delay = max(0, delay_seconds)
-        earliest = loop.time() + base_delay
-        lane = self.queue_lane(kind)
-        slot = max(earliest, self.next_slot_at.get(lane, 0.0))
-        self.next_slot_at[lane] = slot + self.spread_seconds(kind)
-        final_delay = max(0, slot - loop.time())
+        final_delay = max(0, delay_seconds)
         task = asyncio.create_task(self.run_scheduled(username, user_id, kind, final_delay, callback))
         self.tasks[key] = task
         task.add_done_callback(lambda _: self.tasks.pop(key, None))
         run_at = datetime.fromtimestamp(utc_now().timestamp() + final_delay, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         label = self.task_label(kind)
-        if final_delay > base_delay + 60:
-            message = (
-                f"{label} queued for {username} ({user_id}). "
-                f"Dashboard delay is {format_delay(base_delay)}, queue spread moved it to {format_delay(final_delay)} at {run_at}."
-            )
-        else:
-            message = f"{label} queued for {username} ({user_id}). Planned in {format_delay(final_delay)} at {run_at}."
-        asyncio.create_task(self.db.log(message, "info"))
+        asyncio.create_task(self.db.log(f"{label} queued for {username} ({user_id}). Planned in {format_delay(final_delay)} at {run_at}.", "info"))
 
     async def run_scheduled(self, username: str, user_id: str, kind: str, delay_seconds: float, callback) -> None:
         await asyncio.sleep(delay_seconds)
@@ -180,16 +166,6 @@ class BotState:
 
     def friend_delay_seconds(self, config: dict) -> int:
         return max(positive_int(config.get("friendRequestDelayMinutes"), 0), positive_int(config.get("safetyMinFriendRequestDelayMinutes"), 30)) * 60
-
-    def spread_seconds(self, kind: str) -> int:
-        if kind == "friend_request":
-            return positive_int(self.current_config.get("queueFriendRequestSpreadSeconds"), 900)
-        return positive_int(self.current_config.get("queueDmSpreadSeconds"), 120)
-
-    def queue_lane(self, kind: str) -> str:
-        if kind == "friend_request":
-            return "friend_request"
-        return "dm"
 
     def task_label(self, kind: str) -> str:
         labels = {
