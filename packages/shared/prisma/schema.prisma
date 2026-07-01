@@ -10,6 +10,7 @@ generator client {
 model SystemConfig {
   id                  String   @id @default("default")
   welcomeMessage      String   @default("Hey! Welcome.\n\nHave you played Crystal PvP before?\n\nReply here if you'd like help getting started.")
+  initialMessageVariants String @default("[]")
   followupMessage     String   @default("Just checking in!\n\nIf you'd like help getting started, feel free to reply.")
   initialDelayMinutes Int      @default(15)
   followupDelayHours  Int      @default(24)

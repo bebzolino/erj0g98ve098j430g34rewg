@@ -19,6 +19,7 @@ type Tab = 'overview' | 'accounts' | 'messages' | 'blacklist' | 'proxies' | 'sta
 
 interface SystemConfig {
   welcomeMessage: string;
+  initialMessageVariants: string;
   followupMessage: string;
   initialDelayMinutes: number;
   followupDelayHours: number;
@@ -128,6 +129,15 @@ function blacklistTypeBadge(type: BlacklistType): string {
     return 'Allowed guild ID';
   }
   return type === 'guild' ? 'Blocked guild ID' : 'Blocked user ID';
+}
+
+function parseMessageVariants(value?: string): string[] {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 interface StatusSnapshot {
@@ -289,6 +299,10 @@ export default function Dashboard() {
     if (!config) return;
     if (containsLink(config.welcomeMessage || '')) {
       showError('Welcome Message cannot contain links.');
+      return;
+    }
+    if (parseMessageVariants(config.initialMessageVariants).some((variant) => containsLink(variant))) {
+      showError('Initial message variants cannot contain links.');
       return;
     }
 
@@ -485,6 +499,27 @@ export default function Dashboard() {
       return;
     }
     updateConfig('welcomeMessage', value);
+  };
+
+  const updateInitialVariant = (index: number, value: string) => {
+    if (containsLink(value)) {
+      showError('Links are not allowed in Initial Message variants.');
+      return;
+    }
+    const variants = parseMessageVariants(config?.initialMessageVariants);
+    variants[index] = value;
+    updateConfig('initialMessageVariants', JSON.stringify(variants));
+  };
+
+  const addInitialVariant = () => {
+    const variants = parseMessageVariants(config?.initialMessageVariants);
+    updateConfig('initialMessageVariants', JSON.stringify([...variants, '']));
+  };
+
+  const removeInitialVariant = (index: number) => {
+    const variants = parseMessageVariants(config?.initialMessageVariants);
+    variants.splice(index, 1);
+    updateConfig('initialMessageVariants', JSON.stringify(variants));
   };
 
   const blockWelcomePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -823,6 +858,31 @@ export default function Dashboard() {
                         rows={4}
                       />
                     </Field>
+                    <div className="variant-list">
+                      <div className="variant-list-header">
+                        <span>Initial Message Variants</span>
+                        <button className="icon-button" type="button" onClick={addInitialVariant} title="Add initial message variant">
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      {parseMessageVariants(config.initialMessageVariants).length === 0 && (
+                        <div className="empty-state compact">No extra variants. The welcome message is used by default.</div>
+                      )}
+                      {parseMessageVariants(config.initialMessageVariants).map((variant, index) => (
+                        <div className="variant-row" key={index}>
+                          <textarea
+                            value={variant}
+                            onChange={(event) => updateInitialVariant(index, event.target.value)}
+                            onPaste={blockWelcomePaste}
+                            rows={3}
+                            placeholder={`Variant ${index + 1}`}
+                          />
+                          <button className="danger-button" type="button" onClick={() => removeInitialVariant(index)} title="Remove initial message variant">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                     <Field label="Follow-up Message">
                       <textarea value={config.followupMessage} onChange={(event) => updateConfig('followupMessage', event.target.value)} rows={4} />
                     </Field>
@@ -1342,6 +1402,38 @@ export default function Dashboard() {
           color: #f5f5f5;
           background: #1a1a1c;
           padding: 9px;
+        }
+        .variant-list {
+          display: grid;
+          gap: 10px;
+        }
+        .variant-list-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          color: #a1a1aa;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .variant-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: start;
+        }
+        .variant-row textarea {
+          width: 100%;
+          border: 1px solid #2b2b31;
+          border-radius: 8px;
+          outline: none;
+          color: #f5f5f5;
+          background: #1a1a1c;
+          padding: 12px 13px;
+          resize: vertical;
+        }
+        .empty-state.compact {
+          padding: 12px;
         }
         .status-pill, .member-status {
           padding: 5px 9px;

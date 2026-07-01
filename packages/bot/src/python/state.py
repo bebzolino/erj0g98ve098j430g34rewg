@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import random
 import re
 from datetime import datetime, timezone
 
@@ -268,6 +270,7 @@ class BotState:
         try:
             await self.send_direct_message(client, user_id, member, message, log_label, username, account_name)
         except discord.Forbidden as exc:
+            await self.db.clear_assigned_account(user_id, account_id)
             await self.db.update_member_status(user_id, fail_status)
             await self.db.log(f'{log_label} failed for {username} using account "{account_name}": Discord refused this DM for this user. Account stays active. Details: {exc}', "error")
             return False
@@ -278,9 +281,11 @@ class BotState:
                 await self.db.set_account_status(account_id, STATUS_RATE_LIMITED, "Discord rate limited this account.")
             else:
                 await self.db.log(f'{log_label} failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc}).', "error")
+            await self.db.clear_assigned_account(user_id, account_id)
             await self.db.update_member_status(user_id, fail_status)
             return False
         except Exception as exc:
+            await self.db.clear_assigned_account(user_id, account_id)
             await self.db.update_member_status(user_id, fail_status)
             await self.db.log(f'{log_label} failed for {username} using account "{account_name}": {exc}', "error")
             return False
@@ -379,12 +384,23 @@ class BotState:
         if not member or member.get("status") not in {MEMBER_PENDING, MEMBER_FAILED_DM}:
             return False
         config = await self.db.fetch_config()
-        message = config.get("welcomeMessage") or ""
+        message = self.choose_initial_message(config)
         if LINK_PATTERN.search(message):
             await self.db.update_member_status(user_id, MEMBER_FAILED_DM)
             await self.db.log("Initial DM blocked: Welcome Message contains a link. Remove the link in Settings.", "error")
             return False
         return await self.send_dm(user_id, message, MEMBER_FIRST_DM_SENT, MEMBER_FAILED_DM, "Initial DM")
+
+    def choose_initial_message(self, config: dict) -> str:
+        messages = [str(config.get("welcomeMessage") or "").strip()]
+        try:
+            variants = json.loads(config.get("initialMessageVariants") or "[]")
+        except (TypeError, ValueError):
+            variants = []
+        if isinstance(variants, list):
+            messages.extend(str(value).strip() for value in variants)
+        usable = [message for message in messages if message]
+        return random.choice(usable) if usable else ""
 
     async def send_followup_dm(self, user_id: str) -> bool:
         member = await self.db.fetch_member(user_id)

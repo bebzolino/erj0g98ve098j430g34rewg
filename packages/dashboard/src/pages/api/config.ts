@@ -5,6 +5,15 @@ function containsLink(value: string) {
   return /(?:https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/|[a-z0-9-]+\.[a-z]{2,}(?:\/|\b))/i.test(value);
 }
 
+function parseVariants(value: unknown): string[] {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
@@ -17,10 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (containsLink(String(body.welcomeMessage || ''))) {
         return res.status(400).json({ error: 'Welcome Message cannot contain links' });
       }
+      const initialMessageVariants = parseVariants(body.initialMessageVariants);
+      if (initialMessageVariants.some((variant) => containsLink(variant))) {
+        return res.status(400).json({ error: 'Initial Message variants cannot contain links' });
+      }
       const config = await prisma.systemConfig.update({
         where: { id: 'default' },
         data: {
           welcomeMessage: body.welcomeMessage,
+          initialMessageVariants: JSON.stringify(initialMessageVariants),
           followupMessage: body.followupMessage,
           initialDelayMinutes: Number(body.initialDelayMinutes),
           followupDelayHours: Number(body.followupDelayHours),

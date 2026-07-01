@@ -39,7 +39,11 @@ class OutreachClient(discord.Client):
         if not created:
             await self.state.db.log(f"Ignored rejoin for {member.name} ({member.id}). This member was already processed before.", "info")
             return
-        await self.state.db.assign_account(user_id, self.account["id"])
+        delivery_account_id = await self.state.db.choose_delivery_account()
+        if not delivery_account_id:
+            await self.state.db.log(f"No active delivery account available for {member.name} ({member.id}).", "error")
+            return
+        await self.state.db.assign_account(user_id, delivery_account_id)
         await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
         self.state.schedule_join_actions(user_id, member.name, config, 0, bool(config.get("enableFriendRequests")))
 

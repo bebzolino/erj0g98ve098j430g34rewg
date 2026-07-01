@@ -30,6 +30,7 @@ class Database:
                     CREATE TABLE IF NOT EXISTS "SystemConfig" (
                         id TEXT PRIMARY KEY DEFAULT 'default',
                         "welcomeMessage" TEXT NOT NULL DEFAULT 'Hey! Welcome.\n\nHave you played Crystal PvP before?\n\nReply here if you''d like help getting started.',
+                        "initialMessageVariants" TEXT NOT NULL DEFAULT '[]',
                         "followupMessage" TEXT NOT NULL DEFAULT 'Just checking in!\n\nIf you''d like help getting started, feel free to reply.',
                         "initialDelayMinutes" INTEGER NOT NULL DEFAULT 15,
                         "followupDelayHours" INTEGER NOT NULL DEFAULT 24,
@@ -72,6 +73,7 @@ class Database:
                     """
                 )
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT \'[]\'')
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS "Account" (
@@ -295,6 +297,30 @@ class Database:
                 cur.execute('UPDATE "Account" SET status = %s WHERE id = %s', (status, account_id))
             conn.commit()
 
+    async def choose_delivery_account(self) -> str | None:
+        return await self.run(self._choose_delivery_account)
+
+    def _choose_delivery_account(self) -> str | None:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM "Account"
+                    WHERE status = %s
+                    ORDER BY "lastUsedAt" ASC NULLS FIRST, "createdAt" ASC
+                    LIMIT 1
+                    """,
+                    ("active",),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                account_id = row[0]
+                cur.execute('UPDATE "Account" SET "lastUsedAt" = NOW() WHERE id = %s', (account_id,))
+            conn.commit()
+            return account_id
+
     async def upsert_member_join(
         self,
         user_id: str,
@@ -456,4 +482,19 @@ class Database:
             with conn.cursor() as cur:
                 cur.execute('UPDATE "Member" SET "assignedAccountId" = %s WHERE "userId" = %s', (account_id, user_id))
                 cur.execute('UPDATE "Account" SET "lastUsedAt" = NOW() WHERE id = %s', (account_id,))
+            conn.commit()
+
+    async def clear_assigned_account(self, user_id: str, account_id: str | None = None) -> None:
+        await self.run(self._clear_assigned_account, user_id, account_id)
+
+    def _clear_assigned_account(self, user_id: str, account_id: str | None) -> None:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                if account_id:
+                    cur.execute(
+                        'UPDATE "Member" SET "assignedAccountId" = NULL WHERE "userId" = %s AND "assignedAccountId" = %s',
+                        (user_id, account_id),
+                    )
+                else:
+                    cur.execute('UPDATE "Member" SET "assignedAccountId" = NULL WHERE "userId" = %s', (user_id,))
             conn.commit()
