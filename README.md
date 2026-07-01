@@ -1,189 +1,129 @@
 # Made for MadeToFight
 
-This is a short setup guide for railway.
+This project is ready for render.com.
 
-The project has two services.
+It has one repo and three Render parts.
 
-One service is the dashboard.
+Dashboard is a web service.
 
-The second service is the bot.
+Bot is a background worker.
 
-Both services must use the same postgres database.
+Database is postgres.
 
-## 1. Create the database
+## Easy setup with blueprint
 
-Open your railway project.
+Open Render.
 
-Click add.
+Click new.
 
-Choose database.
-
-Choose postgres.
-
-Wait until railway creates it.
-
-Open the postgres service.
-
-Go to variables.
-
-Copy the database url.
-
-You will need it for both services.
-
-## 2. Create the dashboard service
-
-Click add.
-
-Choose github repo.
+Choose blueprint.
 
 Choose this repo.
 
-For the dashboard service leave root directory empty.
-
-This means railway will use the main folder of the repo.
-
-The dashboard uses this file.
+Render will read this file.
 
 ```text
-railway.toml
+render.yaml
 ```
 
-This file points railway to this dockerfile.
+It will create these services.
+
+```text
+customer404-dashboard
+customer404-bot
+customer404-db
+```
+
+The dashboard and bot will use the same database url.
+
+You do not need to paste the database url by hand if you use the blueprint.
+
+## Manual setup
+
+You can also create everything by hand.
+
+First create postgres.
+
+Use this name.
+
+```text
+customer404-db
+```
+
+Leave database and user empty if you want Render to generate them.
+
+Keep the same region for the services and the database.
+
+Then create dashboard as a web service.
+
+Use the same repo.
+
+Use docker.
+
+Set dockerfile path to this.
 
 ```text
 Dockerfile.dashboard
 ```
 
-Now open variables for the dashboard service.
-
-Add this variable.
+Add this env variable.
 
 ```text
-DATABASE_URL=your postgres database url
+DATABASE_URL=your render postgres internal database url
 ```
 
-Deploy the dashboard.
+Then create bot as a background worker.
 
-After deploy finishes open the public url from the dashboard service.
+Use the same repo.
 
-If you see the web panel then this part is fine.
+Use docker.
 
-## 3. Create the bot service
-
-Click add again.
-
-Choose github repo.
-
-Choose the same repo.
-
-For the bot service set root directory to this.
+Set dockerfile path to this.
 
 ```text
-packages/bot
+Dockerfile.bot
 ```
 
-This is important.
-
-If you do not set this then railway can start the wrong app.
-
-The bot uses this file.
+Add the same env variable.
 
 ```text
-packages/bot/railway.toml
+DATABASE_URL=your render postgres internal database url
 ```
 
-This file points railway to this dockerfile.
+## Secrets
+
+Do not put real tokens in github.
+
+Put secrets only in Render env.
+
+Add these only if you use them.
 
 ```text
-packages/bot/Dockerfile
+GEMINI_API_KEY=
+ANYSOLVER_KEY=
+CAPSOLVER_KEY=
 ```
 
-Now open variables for the bot service.
+Discord accounts are added from the dashboard.
 
-Add the same database url.
+Proxy settings are also added from the dashboard.
 
-```text
-DATABASE_URL=your postgres database url
-```
+## After deploy
 
-Deploy the bot.
+Open the dashboard service url.
 
-The bot will create the database tables by itself when it starts.
+Do not open the worker url.
 
-In the logs you should see this.
+The worker is only for the bot process.
+
+The bot creates the database tables on startup.
+
+In logs you should see this.
 
 ```text
 Database schema is ready.
 ```
 
-## 4. Check the public url
+If the dashboard cannot load then check `DATABASE_URL`.
 
-Only the dashboard needs a public url.
-
-The bot does not need a public url.
-
-If you open the bot url by mistake you will only see a small json message.
-
-That is normal.
-
-Use the dashboard url for the web panel.
-
-## 5. First setup in the dashboard
-
-Open the dashboard.
-
-Go to settings.
-
-Set your messages.
-
-Set your delays.
-
-Set captcha settings if you use captcha solving.
-
-Set gemini key if you use ai classification.
-
-Save settings.
-
-Then go to accounts.
-
-Add your account token.
-
-The bot can load accounts without restarting.
-
-## 6. If something crashes
-
-Open the service logs in railway.
-
-If the dashboard crashes then check the dashboard service.
-
-If the bot crashes then check the bot service.
-
-If you see a database error then check that both services have the same `DATABASE_URL`.
-
-If you see `relation does not exist` then redeploy the bot.
-
-The bot should create the tables on startup.
-
-If you see that the dashboard shows a bot json message then the public url is attached to the bot service.
-
-Move the public url to the dashboard service.
-
-## 7. Important settings
-
-Dashboard service root directory should be empty.
-
-Bot service root directory should be this.
-
-```text
-packages/bot
-```
-
-Both services need this variable.
-
-```text
-DATABASE_URL=your postgres database url
-```
-
-Do not upload real secrets to github.
-
-Put secrets only in railway variables.
+If the bot cannot start then check the worker logs.

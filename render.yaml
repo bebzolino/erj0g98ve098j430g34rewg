@@ -1,0 +1,35 @@
+databases:
+  - name: customer404-db
+    databaseName: customer404
+    user: customer404
+
+services:
+  - type: web
+    name: customer404-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile.dashboard
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: customer404-db
+          property: connectionString
+
+  - type: worker
+    name: customer404-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile.bot
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: customer404-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANYSOLVER_KEY
+        sync: false
+      - key: CAPSOLVER_KEY
+        sync: false
