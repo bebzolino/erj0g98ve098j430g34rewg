@@ -438,15 +438,10 @@ class BotState:
             return False
         account_id, client = selected
         account_name = client.account.get("username") or account_id
-        stage = "fetch_user"
         try:
-            recipient = await client.fetch_user(int(user_id))
-            if not hasattr(recipient, "send_friend_request"):
-                raise RuntimeError("discord.py-self user object has no send_friend_request method")
-            stage = "send_friend_request"
-            await recipient.send_friend_request()
+            await self.send_friend_request_to_user(client, user_id, member, username, account_name)
         except discord.Forbidden as exc:
-            await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": Discord refused the friend request API for this account/session. DM can still work. Account stays active. Details: {exc}', "error")
+            await self.db.log(f'Friend request failed for {username} using account "{account_name}": Discord refused the friend request API for this account/session. DM can still work. Account stays active. Details: {exc}', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         except discord.HTTPException as exc:
@@ -455,15 +450,83 @@ class BotState:
             elif getattr(exc, "status", None) == 429:
                 await self.db.set_account_status(account_id, STATUS_RATE_LIMITED, "Discord rate limited this account.")
             else:
-                await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc}).', "error")
+                await self.db.log(f'Friend request failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc}).', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         except Exception as exc:
-            await self.db.log(f'Friend request {stage} failed for {username} using account "{account_name}": {exc}', "error")
+            await self.db.log(f'Friend request failed for {username} using account "{account_name}": {exc}', "error")
             await self.db.update_friend_status(user_id, FRIEND_FAILED)
             return False
         await self.db.update_friend_status(user_id, FRIEND_SENT)
         return True
+
+    async def send_friend_request_to_user(
+        self,
+        client: OutreachClient,
+        user_id: str,
+        member: dict,
+        username: str,
+        account_name: str,
+    ) -> None:
+        recipient_id = int(user_id)
+        guild_id = member.get("guildId")
+        if guild_id:
+            try:
+                guild = client.get_guild(int(guild_id))
+                guild_member = guild.get_member(recipient_id) if guild else None
+                if not guild_member and guild and hasattr(guild, "fetch_member"):
+                    guild_member = await guild.fetch_member(recipient_id)
+                if guild_member and await self.try_friend_request_target(guild_member, "guild_member", username, account_name):
+                    return
+            except discord.Forbidden as exc:
+                await self.db.log(f'Friend request guild_member lookup failed for {username} using account "{account_name}": {exc}', "warn")
+            except discord.HTTPException as exc:
+                await self.db.log(f'Friend request guild_member lookup failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+
+        cached_user = client.get_user(recipient_id)
+        if cached_user and await self.try_friend_request_target(cached_user, "cached_user", username, account_name):
+            return
+
+        for guild in client.guilds:
+            cached_member = guild.get_member(recipient_id)
+            if cached_member and await self.try_friend_request_target(cached_member, f"cached guild member in guild {guild.id}", username, account_name):
+                return
+
+        try:
+            recipient = await client.fetch_user(recipient_id)
+        except discord.Forbidden as exc:
+            await self.db.log(f'Friend request fetch_user failed for {username} using account "{account_name}": {exc}', "error")
+            raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'Friend request fetch_user failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "error")
+            raise
+
+        if not hasattr(recipient, "send_friend_request"):
+            raise RuntimeError("discord.py-self user object has no send_friend_request method")
+        try:
+            await recipient.send_friend_request()
+            return
+        except discord.Forbidden as exc:
+            await self.db.log(f'Friend request fetch_user result.send_friend_request failed for {username} using account "{account_name}": {exc}', "error")
+            raise
+        except discord.HTTPException as exc:
+            await self.db.log(f'Friend request fetch_user result.send_friend_request failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "error")
+            raise
+
+    async def try_friend_request_target(self, target, source: str, username: str, account_name: str) -> bool:
+        if not hasattr(target, "send_friend_request"):
+            return False
+        try:
+            await target.send_friend_request()
+            return True
+        except discord.Forbidden as exc:
+            await self.db.log(f'Friend request {source}.send_friend_request failed for {username} using account "{account_name}": {exc}', "warn")
+            return False
+        except discord.HTTPException as exc:
+            if getattr(exc, "status", None) in {401, 429}:
+                raise
+            await self.db.log(f'Friend request {source}.send_friend_request failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
+            return False
 
     async def handle_user_reply(self, user_id: str, username: str, content: str) -> None:
         if await self.db.is_blacklisted("user", user_id):
