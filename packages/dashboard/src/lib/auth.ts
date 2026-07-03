@@ -45,14 +45,15 @@ export function verifyPassword(password: string) {
   return timingSafeEqual(password, expected);
 }
 
-export function createSessionCookie() {
+export function createSessionCookie(req?: Pick<NextApiRequest, 'headers'>) {
   if (!getSecret()) {
     throw new Error('DASHBOARD_AUTH_SECRET is not configured');
   }
   const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
   const payload = String(expiresAt);
   const token = `${payload}.${sign(payload)}`;
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const forwardedProto = String(req?.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const secure = forwardedProto === 'https' ? '; Secure' : '';
   return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
 }
 

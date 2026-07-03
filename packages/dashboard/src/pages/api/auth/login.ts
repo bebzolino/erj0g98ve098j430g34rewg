@@ -34,6 +34,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!verifyPassword(String(req.body?.password || ''))) {
     return res.status(401).json({ error: 'Invalid password' });
   }
-  res.setHeader('Set-Cookie', createSessionCookie());
+  res.setHeader('Set-Cookie', createSessionCookie(req));
   return res.status(200).json({ success: true });
 }
