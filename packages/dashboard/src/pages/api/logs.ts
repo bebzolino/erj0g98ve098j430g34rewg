@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from 'shared';
+import { requireAuth } from '../../lib/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireAuth(req, res)) return;
   try {
     if (req.method === 'GET') {
       const logs = await prisma.log.findMany({

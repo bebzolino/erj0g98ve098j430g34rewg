@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import {
   Activity,
   AlertTriangle,
   Home,
   Info,
+  LogOut,
   MessageSquare,
   Plus,
   RefreshCw,
@@ -14,6 +16,7 @@ import {
   Users,
   Wifi,
 } from 'lucide-react';
+import { isAuthConfigured, isAuthenticated } from '../lib/auth';
 
 type Tab = 'overview' | 'accounts' | 'messages' | 'blacklist' | 'proxies' | 'status' | 'settings';
 
@@ -473,6 +476,11 @@ export default function Dashboard() {
     showNotice('Logs cleared');
   };
 
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  };
+
   const postMemberAction = async (action: string, payload: Record<string, string>) => {
     const res = await fetch('/api/members', {
       method: 'POST',
@@ -570,6 +578,9 @@ export default function Dashboard() {
             </div>
             <button className="icon-button" onClick={loadData} title="Refresh data">
               <RefreshCw size={18} />
+            </button>
+            <button className="icon-button" onClick={logout} title="Log out">
+              <LogOut size={18} />
             </button>
           </header>
 
@@ -1697,6 +1708,18 @@ export default function Dashboard() {
     </>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  if (isAuthConfigured() && !isAuthenticated(req)) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+  return { props: {} };
+};
 
 function Field({ label, info, children }: { label: string; info?: string; children: React.ReactNode }) {
   return (

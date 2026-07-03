@@ -1,4 +1,5 @@
 import os
+import hmac
 
 from aiohttp import web
 
@@ -6,7 +7,15 @@ from status import MEMBER_FAILED_DM, MEMBER_FIRST_DM_SENT
 
 
 def create_app(state) -> web.Application:
-    app = web.Application()
+    app = web.Application(client_max_size=64 * 1024)
+    api_key = os.getenv("BOT_API_KEY") or ""
+    production_like = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_SERVICE_NAME") or os.getenv("NODE_ENV") == "production")
+
+    def is_authorized(request: web.Request) -> bool:
+        if not api_key:
+            return True
+        provided = request.headers.get("x-bot-api-key", "")
+        return hmac.compare_digest(provided, api_key)
 
     async def handle_health(request: web.Request) -> web.Response:
         return web.json_response({
@@ -16,6 +25,11 @@ def create_app(state) -> web.Application:
         })
 
     async def handle_api(request: web.Request) -> web.Response:
+        if production_like and not api_key:
+            return web.json_response({"error": "BOT_API_KEY is not configured"}, status=503)
+        if not is_authorized(request):
+            return web.json_response({"error": "Unauthorized"}, status=401)
+
         try:
             payload = await request.json()
         except Exception:

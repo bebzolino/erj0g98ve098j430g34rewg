@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { ensureDatabaseShape, prisma } from 'shared';
+import { requireAuth } from '../../lib/auth';
 
 function maskProxy(url: string): string {
   try {
@@ -23,6 +24,7 @@ function cleanProxyUrl(value: string): string {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireAuth(req, res)) return;
   try {
     await ensureDatabaseShape();
 

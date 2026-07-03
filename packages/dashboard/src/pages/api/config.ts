@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma, getOrCreateConfig } from 'shared';
+import { requireAuth } from '../../lib/auth';
 
 function containsLink(value: string) {
   return /(?:https?:\/\/|www\.|discord\.gg\/|discord\.com\/invite\/|[a-z0-9-]+\.[a-z]{2,}(?:\/|\b))/i.test(value);
@@ -15,6 +16,7 @@ function parseVariants(value: unknown): string[] {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireAuth(req, res)) return;
   try {
     if (req.method === 'GET') {
       const config = await getOrCreateConfig();

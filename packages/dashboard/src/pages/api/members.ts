@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from 'shared';
+import { requireAuth } from '../../lib/auth';
 
 const isRailway = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_STATIC_URL || !!process.env.RAILWAY_SERVICE_NAME;
 const defaultBotUrl = isRailway
@@ -55,7 +56,10 @@ async function sendBotCommand(action: string, payload: any) {
 
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.BOT_API_KEY ? { 'x-bot-api-key': process.env.BOT_API_KEY } : {}),
+        },
         body: JSON.stringify({ action, ...payload }),
         signal: controller.signal,
       });
@@ -87,6 +91,7 @@ async function sendBotCommand(action: string, payload: any) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireAuth(req, res)) return;
   try {
     if (req.method === 'GET') {
       const members = await prisma.member.findMany({
