@@ -28,8 +28,8 @@ interface SystemConfig {
   followupDelayHours: number;
   enableAi: boolean;
   confidenceThreshold: number;
-  webhookUrl: string;
-  staffRole: string;
+  telegramBotToken: string;
+  telegramChatId: string;
   typingSimulation: boolean;
   enableFriendRequests: boolean;
   processRejoins: boolean;
@@ -946,11 +946,11 @@ export default function Dashboard() {
                       <Field label="Gemini API Key">
                         <input value={config.geminiApiKey || ''} onChange={(event) => updateConfig('geminiApiKey', event.target.value)} type="password" />
                       </Field>
-                      <Field label="Webhook URL">
-                        <input value={config.webhookUrl || ''} onChange={(event) => updateConfig('webhookUrl', event.target.value)} />
+                      <Field label="Telegram Bot Token">
+                        <input value={config.telegramBotToken || ''} onChange={(event) => updateConfig('telegramBotToken', event.target.value)} type="password" />
                       </Field>
-                      <Field label="Staff Role">
-                        <input value={config.staffRole || ''} onChange={(event) => updateConfig('staffRole', event.target.value)} />
+                      <Field label="Telegram Chat ID">
+                        <input value={config.telegramChatId || ''} onChange={(event) => updateConfig('telegramChatId', event.target.value)} />
                       </Field>
                     </div>
                   </ConfigPanel>

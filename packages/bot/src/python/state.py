@@ -27,6 +27,7 @@ from status import (
     STATUS_RATE_LIMITED,
     STATUS_UNAVAILABLE,
 )
+from telegram import build_reply_notification, send_telegram_message
 from utils import format_delay, parse_timestamp, positive_int, utc_now
 
 MAX_SCHEDULE_AHEAD_SECONDS = 3600
@@ -550,3 +551,18 @@ class BotState:
                 "info",
             )
         await self.db.log(f'Reply received from {username} ({user_id}): "{content}"', "info")
+        try:
+            sent = await send_telegram_message(
+                config,
+                build_reply_notification(
+                    username,
+                    user_id,
+                    content,
+                    result,
+                    include_ai_footer=bool(config.get("enableAi")),
+                ),
+            )
+            if sent:
+                await self.db.log(f"Telegram notification sent for reply from {username} ({user_id}).", "success")
+        except Exception as exc:
+            await self.db.log(f"Telegram notification failed for reply from {username} ({user_id}): {exc}", "error")

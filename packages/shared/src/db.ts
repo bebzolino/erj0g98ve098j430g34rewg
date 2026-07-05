@@ -12,6 +12,8 @@ async function ensureRuntimeColumns() {
   await prisma.$executeRaw`ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT '[]'`;
   await prisma.$executeRaw`ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE`;
   await prisma.$executeRaw`ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT ''`;
+  await prisma.$executeRaw`ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "telegramBotToken" TEXT NOT NULL DEFAULT ''`;
+  await prisma.$executeRaw`ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "telegramChatId" TEXT NOT NULL DEFAULT ''`;
   await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "Proxy" (
       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,

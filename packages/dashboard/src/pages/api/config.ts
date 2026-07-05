@@ -32,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (initialMessageVariants.some((variant) => containsLink(variant))) {
         return res.status(400).json({ error: 'Initial Message variants cannot contain links' });
       }
+      await getOrCreateConfig();
       const config = await prisma.systemConfig.update({
         where: { id: 'default' },
         data: {
@@ -42,8 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           followupDelayHours: Number(body.followupDelayHours),
           enableAi: Boolean(body.enableAi),
           confidenceThreshold: Number(body.confidenceThreshold),
-          webhookUrl: body.webhookUrl,
-          staffRole: body.staffRole,
+          telegramBotToken: String(body.telegramBotToken || ''),
+          telegramChatId: String(body.telegramChatId || ''),
           typingSimulation: Boolean(body.typingSimulation),
           enableFriendRequests: Boolean(body.enableFriendRequests),
           processRejoins: Boolean(body.processRejoins),
