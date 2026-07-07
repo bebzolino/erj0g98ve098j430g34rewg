@@ -436,6 +436,18 @@ class Database:
                 )
                 return int(cur.fetchone()[0]) > 0
 
+    async def has_inbound_conversation(self, user_id: str) -> bool:
+        return await self.run(self._has_inbound_conversation, user_id)
+
+    def _has_inbound_conversation(self, user_id: str) -> bool:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT COUNT(*) FROM "Conversation" WHERE "userId" = %s AND direction = %s',
+                    (user_id, DIR_INBOUND),
+                )
+                return int(cur.fetchone()[0]) > 0
+
     async def create_conversation(self, user_id: str, message: str, direction: str, account_id: str | None = None) -> None:
         await self.run(self._create_conversation, user_id, message, direction, account_id)
 

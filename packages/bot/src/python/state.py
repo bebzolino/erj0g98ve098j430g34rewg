@@ -269,8 +269,12 @@ class BotState:
         member = await self.member_allowed_for_action(user_id, log_label)
         if not member:
             return False
-        selected = await self.choose_account(user_id)
         username = member.get("username") or user_id
+        if await self.db.has_inbound_conversation(user_id):
+            await self.db.update_member_status(user_id, MEMBER_REPLIED)
+            await self.db.log(f"{log_label} skipped for {username}: user already sent a DM to the account.", "info")
+            return False
+        selected = await self.choose_account(user_id)
         if not selected:
             await self.db.update_member_status(user_id, fail_status)
             await self.db.log(f"{log_label} failed for {username}: no active Discord account available.", "error")
@@ -533,9 +537,9 @@ class BotState:
         if await self.db.is_blacklisted("user", user_id):
             await self.db.log(f"Ignored reply from blacklisted user {username} ({user_id}).", "info")
             return
-        await self.db.create_conversation(user_id, content, DIR_INBOUND)
         if not await self.db.fetch_member(user_id):
             await self.db.upsert_member_join(user_id, username, False)
+        await self.db.create_conversation(user_id, content, DIR_INBOUND)
         await self.db.update_member_status(user_id, MEMBER_REPLIED)
         config = await self.db.fetch_config()
         try:
