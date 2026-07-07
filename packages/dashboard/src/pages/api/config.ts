@@ -48,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           typingSimulation: Boolean(body.typingSimulation),
           enableFriendRequests: Boolean(body.enableFriendRequests),
           processRejoins: Boolean(body.processRejoins),
+          skipAutomessagesAfterInbound: Boolean(body.skipAutomessagesAfterInbound),
           rotateDeliveryAccounts: Boolean(body.rotateDeliveryAccounts),
           fixedDeliveryAccountId: String(body.fixedDeliveryAccountId || ''),
           enablePings: Boolean(body.enablePings),

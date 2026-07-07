@@ -33,6 +33,7 @@ interface SystemConfig {
   typingSimulation: boolean;
   enableFriendRequests: boolean;
   processRejoins: boolean;
+  skipAutomessagesAfterInbound: boolean;
   rotateDeliveryAccounts: boolean;
   fixedDeliveryAccountId: string;
   enablePings: boolean;
@@ -961,6 +962,7 @@ export default function Dashboard() {
                       <Toggle label="Typing simulation" checked={config.typingSimulation} onChange={(value) => updateConfig('typingSimulation', value)} />
                       <Toggle label="Friend requests" checked={config.enableFriendRequests} onChange={(value) => updateConfig('enableFriendRequests', value)} />
                       <Toggle label="Process rejoins" checked={config.processRejoins} onChange={(value) => updateConfig('processRejoins', value)} />
+                      <Toggle label="Skip after user DM" checked={config.skipAutomessagesAfterInbound} onChange={(value) => updateConfig('skipAutomessagesAfterInbound', value)} />
                       <Toggle label="Rotate delivery accounts" checked={config.rotateDeliveryAccounts} onChange={(value) => updateConfig('rotateDeliveryAccounts', value)} />
                       <Toggle label="Staff pings" checked={config.enablePings} onChange={(value) => updateConfig('enablePings', value)} />
                     </div>

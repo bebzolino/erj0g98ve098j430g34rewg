@@ -21,6 +21,7 @@ model SystemConfig {
   typingSimulation    Boolean  @default(true)
   enableFriendRequests Boolean @default(false)
   processRejoins       Boolean @default(false)
+  skipAutomessagesAfterInbound Boolean @default(true)
   rotateDeliveryAccounts Boolean @default(true)
   fixedDeliveryAccountId String @default("")
   userToken            String   @default("")

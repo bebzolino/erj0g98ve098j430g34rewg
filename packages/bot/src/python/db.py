@@ -41,6 +41,7 @@ class Database:
                         "typingSimulation" BOOLEAN NOT NULL DEFAULT TRUE,
                         "enableFriendRequests" BOOLEAN NOT NULL DEFAULT FALSE,
                         "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE,
+                        "skipAutomessagesAfterInbound" BOOLEAN NOT NULL DEFAULT TRUE,
                         "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE,
                         "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT '',
                         "userToken" TEXT NOT NULL DEFAULT '',
@@ -75,6 +76,7 @@ class Database:
                     """
                 )
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "skipAutomessagesAfterInbound" BOOLEAN NOT NULL DEFAULT TRUE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT \'[]\'')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT \'\'')

@@ -270,7 +270,8 @@ class BotState:
         if not member:
             return False
         username = member.get("username") or user_id
-        if await self.db.has_inbound_conversation(user_id):
+        config = await self.db.fetch_config()
+        if config.get("skipAutomessagesAfterInbound") is not False and await self.db.has_inbound_conversation(user_id):
             await self.db.update_member_status(user_id, MEMBER_REPLIED)
             await self.db.log(f"{log_label} skipped for {username}: user already sent a DM to the account.", "info")
             return False
