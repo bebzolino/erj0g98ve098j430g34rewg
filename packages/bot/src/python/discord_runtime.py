@@ -7,19 +7,26 @@ import discord
 from captcha import solve_captcha_with_anysolver
 
 
+def curl_socks_proxy_url(proxy_url: str) -> str:
+    if proxy_url.lower().startswith("socks5://"):
+        return "socks5h://" + proxy_url[len("socks5://"):]
+    return proxy_url
+
+
 class OutreachClient(discord.Client):
     def __init__(self, account: dict, state) -> None:
         proxy_url = (account.get("proxyUrl") or "").strip()
         proxy_type = (account.get("proxyType") or "http").strip().lower()
         client_options = {"captcha_handler": solve_captcha_with_anysolver}
         if proxy_url and proxy_type == "socks5":
-            client_options["connector"] = ProxyConnector.from_url(proxy_url)
-            client_options["proxy"] = proxy_url
+            client_options["proxy"] = curl_socks_proxy_url(proxy_url)
             client_options["proxy_gateway"] = True
         super().__init__(**client_options)
         self.account = account
         self.state = state
-        if proxy_url and proxy_type != "socks5":
+        if proxy_url and proxy_type == "socks5":
+            self.http.connector = ProxyConnector.from_url(proxy_url)
+        elif proxy_url:
             self.http.proxy = proxy_url
             self.http.proxy_gateway = True
 

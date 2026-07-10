@@ -33,7 +33,7 @@ function cleanProxyUrl(type: 'http' | 'socks5', value: string): string {
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
     url = `${type}://${url}`;
   }
-  const pattern = type === 'socks5' ? /^socks5:\/\/[^ ]+$/i : /^https?:\/\/[^ ]+$/i;
+  const pattern = type === 'socks5' ? /^socks5h?:\/\/[^ ]+$/i : /^https?:\/\/[^ ]+$/i;
   if (!pattern.test(url)) {
     throw new Error(type === 'socks5' ? 'SOCKS5 proxy must use socks5://host:port' : 'HTTP proxy must use http:// or https://');
   }
