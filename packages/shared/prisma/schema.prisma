@@ -59,6 +59,7 @@ model Account {
   token       String
   username    String   @default("")
   status      String   @default("active") // active, rate_limited, blocked, disabled
+  blocksAutomessagesOnInbound Boolean @default(true)
   proxyId     String?
   lastUsedAt  DateTime?
   createdAt   DateTime @default(now())

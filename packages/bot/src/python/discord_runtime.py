@@ -64,7 +64,7 @@ class OutreachClient(discord.Client):
             return
         if getattr(message, "guild", None) is not None:
             return
-        await self.state.handle_user_reply(str(message.author.id), message.author.name, message.content or "")
+        await self.state.handle_user_reply(str(message.author.id), message.author.name, message.content or "", self.account["id"])
 
     async def on_error(self, event_method: str, *args, **kwargs) -> None:
         exc = sys.exc_info()[1]

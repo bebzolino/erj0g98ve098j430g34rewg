@@ -43,6 +43,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     }
 
+    if (req.method === 'PATCH') {
+      await ensureDatabaseShape();
+      const id = String(req.body.id || '').trim();
+      if (!id) {
+        return res.status(400).json({ error: 'Account ID is required' });
+      }
+      const account = await prisma.account.update({
+        where: { id },
+        data: {
+          blocksAutomessagesOnInbound: Boolean(req.body.blocksAutomessagesOnInbound),
+        },
+      });
+      const { token, ...safeAccount } = account;
+      return res.status(200).json({
+        ...safeAccount,
+        tokenPreview: maskToken(token),
+      });
+    }
+
     return res.status(405).json({ error: 'Method Not Allowed' });
   } catch (error: any) {
     console.error('Error in accounts api:', error);

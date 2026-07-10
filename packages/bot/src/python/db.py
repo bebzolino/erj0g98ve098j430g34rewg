@@ -89,6 +89,7 @@ class Database:
                         token TEXT NOT NULL,
                         username TEXT NOT NULL DEFAULT '',
                         status TEXT NOT NULL DEFAULT 'active',
+                        "blocksAutomessagesOnInbound" BOOLEAN NOT NULL DEFAULT TRUE,
                         "proxyId" TEXT,
                         "lastUsedAt" TIMESTAMPTZ,
                         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -108,6 +109,7 @@ class Database:
                 )
                 cur.execute('ALTER TABLE "Proxy" ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT \'http\'')
                 cur.execute('ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT')
+                cur.execute('ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "blocksAutomessagesOnInbound" BOOLEAN NOT NULL DEFAULT TRUE')
                 cur.execute(
                     """
                     DO $$
@@ -440,14 +442,21 @@ class Database:
                 )
                 return int(cur.fetchone()[0]) > 0
 
-    async def has_inbound_conversation(self, user_id: str) -> bool:
-        return await self.run(self._has_inbound_conversation, user_id)
+    async def has_blocking_inbound_conversation(self, user_id: str) -> bool:
+        return await self.run(self._has_blocking_inbound_conversation, user_id)
 
-    def _has_inbound_conversation(self, user_id: str) -> bool:
+    def _has_blocking_inbound_conversation(self, user_id: str) -> bool:
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    'SELECT COUNT(*) FROM "Conversation" WHERE "userId" = %s AND direction = %s',
+                    """
+                    SELECT COUNT(*)
+                    FROM "Conversation" c
+                    LEFT JOIN "Account" a ON a.id = c."accountId"
+                    WHERE c."userId" = %s
+                      AND c.direction = %s
+                      AND (c."accountId" IS NULL OR a."blocksAutomessagesOnInbound" = TRUE)
+                    """,
                     (user_id, DIR_INBOUND),
                 )
                 return int(cur.fetchone()[0]) > 0

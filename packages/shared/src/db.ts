@@ -26,6 +26,7 @@ async function ensureRuntimeColumns() {
   `;
   await prisma.$executeRaw`ALTER TABLE "Proxy" ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'http'`;
   await prisma.$executeRaw`ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT`;
+  await prisma.$executeRaw`ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "blocksAutomessagesOnInbound" BOOLEAN NOT NULL DEFAULT TRUE`;
   await prisma.$executeRaw`
     DO $$
     BEGIN

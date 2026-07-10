@@ -96,6 +96,7 @@ interface Account {
   id: string;
   username: string;
   status: string;
+  blocksAutomessagesOnInbound: boolean;
   proxyId?: string | null;
   tokenPreview?: string;
   createdAt: string;
@@ -372,6 +373,21 @@ export default function Dashboard() {
 
     await loadData();
     showNotice('Account removed');
+  };
+
+  const updateAccountInboundBlock = async (id: string, blocksAutomessagesOnInbound: boolean) => {
+    const res = await fetch('/api/accounts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, blocksAutomessagesOnInbound }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      showError(data.error || 'Account update failed');
+      return;
+    }
+    await loadData();
+    showNotice('Account automation rule updated');
   };
 
   const addBlacklistEntry = async (event: React.FormEvent) => {
@@ -660,6 +676,14 @@ export default function Dashboard() {
                     <div className="account-body">
                       <strong>{account.username || 'Unnamed account'}</strong>
                       <span>{account.tokenPreview || 'token hidden'}</span>
+                      <label className="inline-toggle">
+                        <input
+                          type="checkbox"
+                          checked={account.blocksAutomessagesOnInbound !== false}
+                          onChange={(event) => updateAccountInboundBlock(account.id, event.target.checked)}
+                        />
+                        <span>Blocks automessages after inbound DM</span>
+                      </label>
                     </div>
                     <span className={`status-pill ${account.status}`}>{statusLabel(account.status)}</span>
                     <button className="danger-button" onClick={() => deleteAccount(account.id)} title="Remove account">
@@ -1427,6 +1451,25 @@ export default function Dashboard() {
           color: #a1a1aa;
           font-size: 12px;
           font-family: Consolas, monospace;
+        }
+        .inline-toggle {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+          color: #d4d4d8;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .inline-toggle input {
+          width: 15px;
+          height: 15px;
+          accent-color: #ff5a5a;
+        }
+        .inline-toggle span {
+          margin-top: 0;
+          font-family: inherit;
+          white-space: normal;
         }
         .proxy-card {
           align-items: flex-start;

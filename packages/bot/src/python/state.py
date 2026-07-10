@@ -273,7 +273,7 @@ class BotState:
             return False
         username = member.get("username") or user_id
         config = await self.db.fetch_config()
-        if config.get("skipAutomessagesAfterInbound") is not False and await self.db.has_inbound_conversation(user_id):
+        if config.get("skipAutomessagesAfterInbound") is not False and await self.db.has_blocking_inbound_conversation(user_id):
             await self.db.update_member_status(user_id, MEMBER_REPLIED)
             await self.db.log(f"{log_label} skipped for {username}: user already sent a DM to the account.", "info")
             return False
@@ -536,13 +536,13 @@ class BotState:
             await self.db.log(f'Friend request {source}.send_friend_request failed for {username} using account "{account_name}": Discord API error {getattr(exc, "status", "unknown")} ({exc})', "warn")
             return False
 
-    async def handle_user_reply(self, user_id: str, username: str, content: str) -> None:
+    async def handle_user_reply(self, user_id: str, username: str, content: str, account_id: str | None = None) -> None:
         if await self.db.is_blacklisted("user", user_id):
             await self.db.log(f"Ignored reply from blacklisted user {username} ({user_id}).", "info")
             return
         if not await self.db.fetch_member(user_id):
             await self.db.upsert_member_join(user_id, username, False)
-        await self.db.create_conversation(user_id, content, DIR_INBOUND)
+        await self.db.create_conversation(user_id, content, DIR_INBOUND, account_id)
         await self.db.update_member_status(user_id, MEMBER_REPLIED)
         config = await self.db.fetch_config()
         try:
