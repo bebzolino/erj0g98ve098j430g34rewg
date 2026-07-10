@@ -19,10 +19,12 @@ async function ensureRuntimeColumns() {
     CREATE TABLE IF NOT EXISTS "Proxy" (
       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
       label TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL DEFAULT 'http',
       url TEXT NOT NULL,
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await prisma.$executeRaw`ALTER TABLE "Proxy" ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'http'`;
   await prisma.$executeRaw`ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT`;
   await prisma.$executeRaw`
     DO $$

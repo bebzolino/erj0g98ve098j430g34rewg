@@ -100,11 +100,13 @@ class Database:
                     CREATE TABLE IF NOT EXISTS "Proxy" (
                         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
                         label TEXT NOT NULL DEFAULT '',
+                        type TEXT NOT NULL DEFAULT 'http',
                         url TEXT NOT NULL,
                         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                     """
                 )
+                cur.execute('ALTER TABLE "Proxy" ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT \'http\'')
                 cur.execute('ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "proxyId" TEXT')
                 cur.execute(
                     """
@@ -262,7 +264,7 @@ class Database:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.label AS "proxyLabel"
+                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.type AS "proxyType", p.label AS "proxyLabel"
                     FROM "Account" a
                     LEFT JOIN "Proxy" p ON p.id = a."proxyId"
                     WHERE a.status = ANY(%s)
@@ -281,7 +283,7 @@ class Database:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.label AS "proxyLabel"
+                    SELECT a.id, a.token, a.username, a.status, a."proxyId", p.url AS "proxyUrl", p.type AS "proxyType", p.label AS "proxyLabel"
                     FROM "Account" a
                     LEFT JOIN "Proxy" p ON p.id = a."proxyId"
                     WHERE a.id = %s

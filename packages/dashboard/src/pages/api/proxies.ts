@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { ensureDatabaseShape, prisma } from 'shared';
 import { requireAuth } from '../../lib/auth';
 
+const allowedProxyTypes = new Set(['http', 'socks5']);
+
 function maskProxy(url: string): string {
   try {
     const parsed = new URL(url);
@@ -15,10 +17,25 @@ function maskProxy(url: string): string {
   }
 }
 
-function cleanProxyUrl(value: string): string {
-  const url = value.trim();
-  if (!/^https?:\/\/[^ ]+$/i.test(url)) {
-    throw new Error('Proxy must start with http:// or https://');
+function cleanProxyType(value: unknown): 'http' | 'socks5' {
+  const type = String(value || 'http').trim().toLowerCase();
+  if (!allowedProxyTypes.has(type)) {
+    throw new Error('Proxy type must be HTTP or SOCKS5');
+  }
+  return type as 'http' | 'socks5';
+}
+
+function cleanProxyUrl(type: 'http' | 'socks5', value: string): string {
+  let url = value.trim();
+  if (!url) {
+    throw new Error('Proxy URL is required');
+  }
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+    url = `${type}://${url}`;
+  }
+  const pattern = type === 'socks5' ? /^socks5:\/\/[^ ]+$/i : /^https?:\/\/[^ ]+$/i;
+  if (!pattern.test(url)) {
+    throw new Error(type === 'socks5' ? 'SOCKS5 proxy must use socks5://host:port' : 'HTTP proxy must use http:// or https://');
   }
   return url;
 }
@@ -41,8 +58,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const label = String(req.body.label || '').trim();
-      const url = cleanProxyUrl(String(req.body.url || ''));
-      const proxy = await prisma.proxy.create({ data: { label, url } });
+      const type = cleanProxyType(req.body.type);
+      const url = cleanProxyUrl(type, String(req.body.url || ''));
+      const proxy = await prisma.proxy.create({ data: { label, type, url } });
       return res.status(200).json({ ...proxy, urlPreview: maskProxy(proxy.url), url: undefined });
     }
 

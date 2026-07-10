@@ -104,6 +104,7 @@ interface Account {
 interface ProxyEntry {
   id: string;
   label: string;
+  type: string;
   urlPreview: string;
   createdAt: string;
 }
@@ -224,6 +225,7 @@ export default function Dashboard() {
   const [blacklistValue, setBlacklistValue] = useState('');
   const [blacklistLabel, setBlacklistLabel] = useState('');
   const [newProxyLabel, setNewProxyLabel] = useState('');
+  const [newProxyType, setNewProxyType] = useState<'socks5' | 'http'>('socks5');
   const [newProxyUrl, setNewProxyUrl] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -420,7 +422,7 @@ export default function Dashboard() {
     const res = await fetch('/api/proxies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newProxyLabel.trim(), url: newProxyUrl.trim() }),
+      body: JSON.stringify({ label: newProxyLabel.trim(), type: newProxyType, url: newProxyUrl.trim() }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) {
@@ -792,12 +794,18 @@ export default function Dashboard() {
                     Add
                   </button>
                 </div>
-                <div className="form-grid two">
+                <div className="form-grid three">
                   <Field label="Label">
                     <input value={newProxyLabel} onChange={(event) => setNewProxyLabel(event.target.value)} placeholder="Warsaw proxy" />
                   </Field>
+                  <Field label="Proxy Type">
+                    <select value={newProxyType} onChange={(event) => setNewProxyType(event.target.value as 'socks5' | 'http')}>
+                      <option value="socks5">SOCKS5</option>
+                      <option value="http">HTTP</option>
+                    </select>
+                  </Field>
                   <Field label="Proxy URL">
-                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder="http://user:pass@host:port" type="password" />
+                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder={newProxyType === 'socks5' ? 'socks5://user:pass@host:port' : 'http://user:pass@host:port'} type="password" />
                   </Field>
                 </div>
               </form>
@@ -811,6 +819,7 @@ export default function Dashboard() {
                       <div className="avatar">P</div>
                       <div className="account-body">
                         <strong>{proxy.label || 'Proxy'}</strong>
+                        <span>{(proxy.type || 'http').toUpperCase()}</span>
                         <span>{proxy.urlPreview}</span>
                         <select
                           multiple

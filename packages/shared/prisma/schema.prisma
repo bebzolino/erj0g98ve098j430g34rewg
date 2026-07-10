@@ -69,6 +69,7 @@ model Account {
 model Proxy {
   id        String   @id @default(uuid())
   label     String   @default("")
+  type      String   @default("http")
   url       String
   createdAt DateTime @default(now())
   accounts  Account[]

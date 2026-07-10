@@ -1,4 +1,5 @@
 python-dotenv>=1.0.0
 psycopg[binary]>=3.2.1
 aiohttp>=3.12.14
+aiohttp_socks>=0.10.1
 discord.py-self>=2.1.0

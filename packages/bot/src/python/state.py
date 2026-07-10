@@ -61,6 +61,7 @@ class BotState:
                 and account.get("token") == client.account.get("token")
                 and account.get("proxyId") == client.account.get("proxyId")
                 and account.get("proxyUrl") == client.account.get("proxyUrl")
+                and account.get("proxyType") == client.account.get("proxyType")
             ):
                 continue
             await self.stop_client(account_id, "account was removed, disabled, or its token changed")
@@ -72,6 +73,7 @@ class BotState:
                 and existing.account.get("token") == account.get("token")
                 and existing.account.get("proxyId") == account.get("proxyId")
                 and existing.account.get("proxyUrl") == account.get("proxyUrl")
+                and existing.account.get("proxyType") == account.get("proxyType")
             ):
                 existing.account = account
                 continue
