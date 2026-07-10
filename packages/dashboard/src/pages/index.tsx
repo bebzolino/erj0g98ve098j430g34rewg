@@ -825,11 +825,11 @@ export default function Dashboard() {
                   <Field label="Proxy Type">
                     <select value={newProxyType} onChange={(event) => setNewProxyType(event.target.value as 'socks5' | 'http')}>
                       <option value="socks5">SOCKS5</option>
-                      <option value="http">HTTP</option>
+                      <option value="http">Proxy</option>
                     </select>
                   </Field>
                   <Field label="Proxy URL">
-                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder={newProxyType === 'socks5' ? 'socks5://user:pass@host:port' : 'http://user:pass@host:port'} type="password" />
+                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder="socks5://host:port or http://user:pass@host:port" type="password" />
                   </Field>
                 </div>
               </form>

@@ -17,8 +17,10 @@ function maskProxy(url: string): string {
   }
 }
 
-function cleanProxyType(value: unknown): 'http' | 'socks5' {
-  const type = String(value || 'http').trim().toLowerCase();
+function cleanProxyType(value: unknown, url: string): 'http' | 'socks5' {
+  const explicitType = String(value || '').trim().toLowerCase();
+  const inferredType = /^socks5h?:\/\//i.test(url) ? 'socks5' : /^https?:\/\//i.test(url) ? 'http' : '';
+  const type = explicitType || inferredType || 'socks5';
   if (!allowedProxyTypes.has(type)) {
     throw new Error('Proxy type must be HTTP or SOCKS5');
   }
@@ -58,8 +60,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const label = String(req.body.label || '').trim();
-      const type = cleanProxyType(req.body.type);
-      const url = cleanProxyUrl(type, String(req.body.url || ''));
+      const rawUrl = String(req.body.url || '');
+      const type = cleanProxyType(req.body.type, rawUrl);
+      const url = cleanProxyUrl(type, rawUrl);
       const proxy = await prisma.proxy.create({ data: { label, type, url } });
       return res.status(200).json({ ...proxy, urlPreview: maskProxy(proxy.url), url: undefined });
     }
