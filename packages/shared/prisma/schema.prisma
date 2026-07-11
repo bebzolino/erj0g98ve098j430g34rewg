@@ -16,6 +16,8 @@ model SystemConfig {
   followupDelayHours  Int      @default(24)
   enableAi            Boolean  @default(true)
   confidenceThreshold Float    @default(0.7)
+  webhookUrl          String   @default("")
+  staffRole           String   @default("")
   telegramBotToken    String   @default("")
   telegramChatId      String   @default("")
   typingSimulation    Boolean  @default(true)

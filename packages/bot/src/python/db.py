@@ -36,6 +36,8 @@ class Database:
                         "followupDelayHours" INTEGER NOT NULL DEFAULT 24,
                         "enableAi" BOOLEAN NOT NULL DEFAULT TRUE,
                         "confidenceThreshold" DOUBLE PRECISION NOT NULL DEFAULT 0.7,
+                        "webhookUrl" TEXT NOT NULL DEFAULT '',
+                        "staffRole" TEXT NOT NULL DEFAULT '',
                         "telegramBotToken" TEXT NOT NULL DEFAULT '',
                         "telegramChatId" TEXT NOT NULL DEFAULT '',
                         "typingSimulation" BOOLEAN NOT NULL DEFAULT TRUE,
@@ -78,6 +80,8 @@ class Database:
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "processRejoins" BOOLEAN NOT NULL DEFAULT FALSE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "skipAutomessagesAfterInbound" BOOLEAN NOT NULL DEFAULT TRUE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "initialMessageVariants" TEXT NOT NULL DEFAULT \'[]\'')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "webhookUrl" TEXT NOT NULL DEFAULT \'\'')
+                cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "staffRole" TEXT NOT NULL DEFAULT \'\'')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "rotateDeliveryAccounts" BOOLEAN NOT NULL DEFAULT TRUE')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "fixedDeliveryAccountId" TEXT NOT NULL DEFAULT \'\'')
                 cur.execute('ALTER TABLE "SystemConfig" ADD COLUMN IF NOT EXISTS "telegramBotToken" TEXT NOT NULL DEFAULT \'\'')
