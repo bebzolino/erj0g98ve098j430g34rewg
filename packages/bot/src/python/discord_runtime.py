@@ -41,7 +41,9 @@ class OutreachClient(discord.Client):
             return
         guild_id = str(member.guild.id) if member.guild else ""
         user_id = str(member.id)
+        await self.state.db.log(f"Join detected: {member.name} ({member.id}) in guild {guild_id or 'unknown'}.", "info")
         if not guild_id or not await self.state.db.is_whitelisted_guild(guild_id):
+            await self.state.db.log(f"Join ignored for {member.name} ({member.id}): guild {guild_id or 'unknown'} is not in the allowed guild list.", "warn")
             return
         if guild_id and await self.state.db.is_blacklisted("guild", guild_id):
             await self.state.db.log(f"Ignored {member.name} ({member.id}) because guild {guild_id} is blacklisted.", "info")
@@ -58,12 +60,12 @@ class OutreachClient(discord.Client):
         delivery_account_id = await self.state.db.choose_delivery_account(config)
         if not delivery_account_id:
             if config.get("rotateDeliveryAccounts") is False:
-                await self.state.db.log(f"No fixed delivery account selected or active for {member.name} ({member.id}).", "error")
+                await self.state.db.log(f"Initial greeting cannot be sent for {member.name} ({member.id}): no fixed delivery account selected or active.", "error")
             else:
-                await self.state.db.log(f"No active delivery account available for {member.name} ({member.id}).", "error")
+                await self.state.db.log(f"Initial greeting cannot be sent for {member.name} ({member.id}): no active delivery account available.", "error")
             return
         await self.state.db.assign_account(user_id, delivery_account_id)
-        await self.state.db.log(f"Member joined whitelisted server {guild_id}: {member.name} ({member.id})", "info")
+        await self.state.db.log(f"Join accepted for {member.name} ({member.id}) in allowed guild {guild_id}. Greeting workflow is live.", "success")
         self.state.schedule_join_actions(user_id, member.name, config, 0, bool(config.get("enableFriendRequests")))
 
     async def on_message(self, message: discord.Message) -> None:

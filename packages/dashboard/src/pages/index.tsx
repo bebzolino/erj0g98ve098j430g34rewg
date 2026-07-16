@@ -232,10 +232,15 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const selectedMember = useMemo(
     () => members.find((member) => member.userId === selectedUserId) ?? members[0] ?? null,
     [members, selectedUserId],
+  );
+  const proxyById = useMemo(
+    () => new Map(proxies.map((proxy) => [proxy.id, proxy] as const)),
+    [proxies],
   );
 
   const stats = useMemo(() => {
@@ -273,11 +278,29 @@ export default function Dashboard() {
     if (statusSnapshot && !('error' in statusSnapshot)) setStatusData(statusSnapshot);
   };
 
+  const loadLogs = async () => {
+    const logsData = await safeFetch<LogEntry[]>('/api/logs', []);
+    setLogs(Array.isArray(logsData) ? logsData : []);
+  };
+
   useEffect(() => {
     loadData();
     const interval = window.setInterval(loadData, 5000);
     return () => window.clearInterval(interval);
   }, [isEditingConfig]);
+
+  useEffect(() => {
+    if (activeTab !== 'overview') return undefined;
+    loadLogs();
+    const interval = window.setInterval(loadLogs, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [activeTab, logs.length]);
 
   useEffect(() => {
     const userId = selectedMember?.userId;
@@ -495,6 +518,22 @@ export default function Dashboard() {
     showNotice('Logs cleared');
   };
 
+  const accountsForProxy = (proxyId: string) => accounts.filter((account) => account.proxyId === proxyId);
+
+  const accountProxySummary = (account: Account) => {
+    if (!account.proxyId) {
+      return { label: 'Proxy: none', type: '' };
+    }
+    const proxy = proxyById.get(account.proxyId);
+    if (!proxy) {
+      return { label: `Proxy: ${account.proxyId}`, type: '' };
+    }
+    return {
+      label: `Proxy: ${proxy.label || proxy.id}`,
+      type: (proxy.type || 'http').toUpperCase(),
+    };
+  };
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
@@ -595,12 +634,14 @@ export default function Dashboard() {
               <p className="eyebrow">Discord outreach dashboard</p>
               <h1>{navItems.find((item) => item.id === activeTab)?.label}</h1>
             </div>
-            <button className="icon-button" onClick={loadData} title="Refresh data">
-              <RefreshCw size={18} />
-            </button>
-            <button className="icon-button" onClick={logout} title="Log out">
-              <LogOut size={18} />
-            </button>
+            <div className="topbar-actions">
+              <button className="icon-button" onClick={loadData} title="Refresh data">
+                <RefreshCw size={18} />
+              </button>
+              <button className="icon-button" onClick={logout} title="Log out">
+                <LogOut size={18} />
+              </button>
+            </div>
           </header>
 
           {(notice || error) && (
@@ -624,8 +665,8 @@ export default function Dashboard() {
               <div className="panel logs-panel">
                 <div className="panel-header">
                   <div>
-                    <h2>System Logs</h2>
-                    <p>Live stream from bot and dashboard actions.</p>
+                    <h2>Overview Console</h2>
+                    <p>Join stream, greeting queue, delivery status, and safety events.</p>
                   </div>
                   <button className="secondary-button" type="button" onClick={clearLogs}>
                     Clear
@@ -640,6 +681,7 @@ export default function Dashboard() {
                       <span>{log.message}</span>
                     </div>
                   ))}
+                  <div ref={logEndRef} />
                 </div>
               </div>
             </section>
@@ -676,6 +718,12 @@ export default function Dashboard() {
                     <div className="account-body">
                       <strong>{account.username || 'Unnamed account'}</strong>
                       <span>{account.tokenPreview || 'token hidden'}</span>
+                      <span className="account-proxy-line">
+                        {accountProxySummary(account).label}
+                      </span>
+                      {accountProxySummary(account).type && (
+                        <span className="account-proxy-type">{accountProxySummary(account).type}</span>
+                      )}
                       <label className="inline-toggle">
                         <input
                           type="checkbox"
@@ -829,7 +877,7 @@ export default function Dashboard() {
                     </select>
                   </Field>
                   <Field label="Proxy URL">
-                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder="socks5://host:port or http://user:pass@host:port" type="password" />
+                    <input value={newProxyUrl} onChange={(event) => setNewProxyUrl(event.target.value)} placeholder="socks5://user:pass@host:port or http://user:pass@host:port" type="password" />
                   </Field>
                 </div>
               </form>
@@ -837,7 +885,7 @@ export default function Dashboard() {
               <div className="accounts-grid">
                 {proxies.length === 0 && <div className="panel empty-state">No proxies configured.</div>}
                 {proxies.map((proxy) => {
-                  const assignedIds = accounts.filter((account) => account.proxyId === proxy.id).map((account) => account.id);
+                  const assignedIds = accountsForProxy(proxy.id).map((account) => account.id);
                   return (
                     <div className="account-card proxy-card" key={proxy.id}>
                       <div className="avatar">P</div>
@@ -845,21 +893,37 @@ export default function Dashboard() {
                         <strong>{proxy.label || 'Proxy'}</strong>
                         <span>{(proxy.type || 'http').toUpperCase()}</span>
                         <span>{proxy.urlPreview}</span>
-                        <select
-                          multiple
-                          className="proxy-account-select"
-                          value={assignedIds}
-                          onChange={(event) => updateProxyAccounts(
-                            proxy.id,
-                            Array.from(event.currentTarget.selectedOptions).map((option) => option.value),
-                          )}
-                        >
-                          {accounts.map((account) => (
-                            <option key={account.id} value={account.id}>
-                              {account.username || account.id}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="proxy-assignment-header">
+                          <span>{assignedIds.length} assigned</span>
+                          <button
+                            className="secondary-button compact"
+                            type="button"
+                            onClick={() => updateProxyAccounts(proxy.id, [])}
+                            disabled={assignedIds.length === 0}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="proxy-account-list">
+                          {accounts.map((account) => {
+                            const checked = account.proxyId === proxy.id;
+                            return (
+                              <label className="proxy-account-row" key={account.id}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(event) => {
+                                    const nextIds = event.currentTarget.checked
+                                      ? [...assignedIds, account.id]
+                                      : assignedIds.filter((id) => id !== account.id);
+                                    updateProxyAccounts(proxy.id, nextIds);
+                                  }}
+                                />
+                                <span>{account.username || account.id}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
                       <span className="status-pill active">{assignedIds.length} accounts</span>
                       <button className="danger-button" onClick={() => deleteProxy(proxy.id)} title="Remove proxy">
@@ -1230,6 +1294,12 @@ export default function Dashboard() {
           justify-content: space-between;
           flex-shrink: 0;
         }
+        .topbar-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-left: auto;
+        }
         .topbar h1 {
           margin: 3px 0 0;
           font-size: 28px;
@@ -1376,6 +1446,11 @@ export default function Dashboard() {
           font-size: 13px;
           font-weight: 800;
         }
+        .secondary-button.compact {
+          min-height: 32px;
+          padding: 7px 11px;
+          font-size: 12px;
+        }
         .secondary-button:hover {
           color: #fff;
           border-color: #3a3a40;
@@ -1452,6 +1527,24 @@ export default function Dashboard() {
           font-size: 12px;
           font-family: Consolas, monospace;
         }
+        .account-proxy-line {
+          margin-top: 6px !important;
+          color: #d4d4d8 !important;
+          font-family: inherit !important;
+        }
+        .account-proxy-type {
+          margin-top: 4px !important;
+          display: inline-flex !important;
+          width: fit-content;
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(96, 165, 250, 0.12);
+          color: #60a5fa !important;
+          font-size: 11px !important;
+          font-weight: 900;
+          letter-spacing: 0.02em;
+          font-family: inherit !important;
+        }
         .inline-toggle {
           display: flex;
           align-items: center;
@@ -1474,16 +1567,39 @@ export default function Dashboard() {
         .proxy-card {
           align-items: flex-start;
         }
-        .proxy-account-select {
+        .proxy-assignment-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
           margin-top: 10px;
-          min-height: 98px;
+          color: #a1a1aa;
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .proxy-account-list {
+          display: grid;
+          gap: 8px;
+          margin-top: 10px;
+          max-height: 180px;
+          overflow: auto;
           width: 100%;
-          border: 1px solid #2b2b31;
           border-radius: 8px;
-          outline: none;
-          color: #f5f5f5;
-          background: #1a1a1c;
-          padding: 9px;
+          padding-right: 4px;
+        }
+        .proxy-account-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: #d4d4d8;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .proxy-account-row input {
+          width: 15px;
+          height: 15px;
+          accent-color: #ff5a5a;
         }
         .variant-list {
           display: grid;

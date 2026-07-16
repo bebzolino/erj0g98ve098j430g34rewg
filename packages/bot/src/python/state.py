@@ -210,6 +210,8 @@ class BotState:
         ok = await callback(user_id)
         if ok:
             await self.db.log(f"{self.task_label(kind)} sent for {username} ({user_id}).", "success")
+        else:
+            await self.db.log(f"{self.task_label(kind)} did not complete for {username} ({user_id}). Check the earlier console lines for the reason.", "warn")
 
     def initial_delay_seconds(self, config: dict) -> int:
         return max(positive_int(config.get("initialDelayMinutes"), 0), positive_int(config.get("safetyMinInitialDmDelayMinutes"), 0)) * 60
@@ -219,8 +221,8 @@ class BotState:
 
     def task_label(self, kind: str) -> str:
         labels = {
-            "initial_dm": "Initial DM",
-            "followup_dm": "Follow-up DM",
+            "initial_dm": "Initial greeting",
+            "followup_dm": "Second greeting",
             "ping_dm": "Ping DM",
             "friend_request": "Friend request",
         }
