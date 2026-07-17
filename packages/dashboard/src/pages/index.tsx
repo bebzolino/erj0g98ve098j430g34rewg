@@ -70,6 +70,7 @@ interface Member {
   username: string;
   joinTime: string;
   status: string;
+  assignedAccountId?: string | null;
   interestScore: number | null;
   interestLevel: string | null;
   sentiment: string | null;
@@ -83,6 +84,8 @@ interface Conversation {
   message: string;
   timestamp: string;
   direction: 'inbound' | 'outbound';
+  accountId?: string | null;
+  accountUsername?: string | null;
 }
 
 interface LogEntry {
@@ -182,6 +185,18 @@ function formatTime(value: string) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDateLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diffDays = Math.round((startOfToday - day) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     active: 'Active',
@@ -231,6 +246,7 @@ export default function Dashboard() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -242,6 +258,11 @@ export default function Dashboard() {
     () => new Map(proxies.map((proxy) => [proxy.id, proxy] as const)),
     [proxies],
   );
+  const accountById = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account] as const)),
+    [accounts],
+  );
+  const selectedAccount = selectedMember?.assignedAccountId ? accountById.get(selectedMember.assignedAccountId) ?? null : null;
 
   const stats = useMemo(() => {
     const delivered = members.filter((member) => ['first_dm_sent', 'replied', 'pinged', 'stopped'].includes(member.status)).length;
@@ -259,23 +280,28 @@ export default function Dashboard() {
   }, [accounts, config, members]);
 
   const loadData = async () => {
-    const [configData, membersData, accountsData, blacklistData, proxyData, logsData, statusSnapshot] = await Promise.all([
-      safeFetch<SystemConfig | null>('/api/config', null),
-      safeFetch<Member[]>('/api/members', []),
-      safeFetch<Account[]>('/api/accounts', []),
-      safeFetch<BlacklistEntry[]>('/api/blacklist', []),
-      safeFetch<ProxyPayload>('/api/proxies', { proxies: [], accounts: [] }),
-      safeFetch<LogEntry[]>('/api/logs', []),
-      safeFetch<StatusSnapshot | null>('/api/status', null),
-    ]);
+    setIsRefreshing(true);
+    try {
+      const [configData, membersData, accountsData, blacklistData, proxyData, logsData, statusSnapshot] = await Promise.all([
+        safeFetch<SystemConfig | null>('/api/config', null),
+        safeFetch<Member[]>('/api/members', []),
+        safeFetch<Account[]>('/api/accounts', []),
+        safeFetch<BlacklistEntry[]>('/api/blacklist', []),
+        safeFetch<ProxyPayload>('/api/proxies', { proxies: [], accounts: [] }),
+        safeFetch<LogEntry[]>('/api/logs', []),
+        safeFetch<StatusSnapshot | null>('/api/status', null),
+      ]);
 
-    if (!isEditingConfig && configData && !('error' in configData)) setConfig(configData);
-    setMembers(Array.isArray(membersData) ? membersData : []);
-    setAccounts(Array.isArray(accountsData) ? accountsData : []);
-    setBlacklist(Array.isArray(blacklistData) ? blacklistData : []);
-    setProxies(Array.isArray(proxyData.proxies) ? proxyData.proxies : []);
-    setLogs(Array.isArray(logsData) ? logsData : []);
-    if (statusSnapshot && !('error' in statusSnapshot)) setStatusData(statusSnapshot);
+      if (!isEditingConfig && configData && !('error' in configData)) setConfig(configData);
+      setMembers(Array.isArray(membersData) ? membersData : []);
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      setBlacklist(Array.isArray(blacklistData) ? blacklistData : []);
+      setProxies(Array.isArray(proxyData.proxies) ? proxyData.proxies : []);
+      setLogs(Array.isArray(logsData) ? logsData : []);
+      if (statusSnapshot && !('error' in statusSnapshot)) setStatusData(statusSnapshot);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const loadLogs = async () => {
@@ -518,6 +544,21 @@ export default function Dashboard() {
     showNotice('Logs cleared');
   };
 
+  const clearConversation = async (userId: string) => {
+    const res = await fetch(`/api/conversations?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'Conversation clear failed');
+      return;
+    }
+
+    setConversations([]);
+    showNotice('Conversation cleared');
+  };
+
   const accountsForProxy = (proxyId: string) => accounts.filter((account) => account.proxyId === proxyId);
 
   const accountProxySummary = (account: Account) => {
@@ -635,12 +676,13 @@ export default function Dashboard() {
               <h1>{navItems.find((item) => item.id === activeTab)?.label}</h1>
             </div>
             <div className="topbar-actions">
-              <button className="icon-button" onClick={loadData} title="Refresh data">
-                <RefreshCw size={18} />
+              <button className={`icon-button ${isRefreshing ? 'loading' : ''}`} onClick={loadData} title="Refresh data">
+                <RefreshCw size={18} className={isRefreshing ? 'spin' : ''} />
               </button>
               <button className="icon-button" onClick={logout} title="Log out">
                 <LogOut size={18} />
               </button>
+              <span className="topbar-status">{isRefreshing ? 'Refreshing' : 'Up to date'}</span>
             </div>
           </header>
 
@@ -774,25 +816,45 @@ export default function Dashboard() {
                       <div>
                         <h2>{selectedMember.username}</h2>
                         <p>
-                          Sentiment: <strong>{selectedMember.sentiment || 'N/A'}</strong>
-                          <span> Confidence: </span>
-                          <strong>{selectedMember.interestScore ?? 'N/A'}</strong>
+                          Messaging via <strong>{selectedAccount?.username || selectedMember.assignedAccountId || 'unassigned account'}</strong>
+                          <span> Join </span>
+                          <strong>{formatTime(selectedMember.joinTime)}</strong>
                         </p>
                       </div>
                       <div className="chat-actions">
-                        <button onClick={() => postMemberAction('trigger_initial', { userId: selectedMember.userId })}>Initial DM</button>
-                        <button onClick={() => postMemberAction('trigger_followup', { userId: selectedMember.userId })}>Follow-up</button>
+                        <button type="button" onClick={() => clearConversation(selectedMember.userId)}>Clear thread</button>
+                        <button type="button" onClick={() => postMemberAction('trigger_initial', { userId: selectedMember.userId })}>Initial DM</button>
+                        <button type="button" onClick={() => postMemberAction('trigger_followup', { userId: selectedMember.userId })}>Follow-up</button>
                       </div>
                     </div>
 
                     <div className="chat-scroll">
                       {conversations.length === 0 && <div className="empty-state">No conversation saved for this member.</div>}
-                      {conversations.map((message) => (
-                        <div className={`bubble ${message.direction}`} key={message.id}>
-                          <p>{message.message}</p>
-                          <span>{formatTime(message.timestamp)}</span>
-                        </div>
-                      ))}
+                      {conversations.map((message, index) => {
+                        const previous = conversations[index - 1];
+                        const currentDate = new Date(message.timestamp);
+                        const previousDate = previous ? new Date(previous.timestamp) : null;
+                        const showDivider =
+                          !previous ||
+                          Number.isNaN(currentDate.getTime()) ||
+                          Number.isNaN(previousDate?.getTime() ?? NaN) ||
+                          currentDate.toDateString() !== previousDate?.toDateString();
+
+                        return (
+                          <React.Fragment key={message.id}>
+                            {showDivider && <div className="date-divider">{formatDateLabel(message.timestamp)}</div>}
+                            <div className={`bubble ${message.direction}`}>
+                              <p>{message.message}</p>
+                              <span>
+                                {message.direction === 'outbound'
+                                  ? `Sent via ${message.accountUsername || message.accountId || 'assigned account'}`
+                                  : 'From member'}{' '}
+                                · {formatTime(message.timestamp)}
+                              </span>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
                       <div ref={chatEndRef} />
                     </div>
 
@@ -1300,6 +1362,11 @@ export default function Dashboard() {
           gap: 10px;
           margin-left: auto;
         }
+        .topbar-status {
+          color: #a1a1aa;
+          font-size: 12px;
+          font-weight: 800;
+        }
         .topbar h1 {
           margin: 3px 0 0;
           font-size: 28px;
@@ -1322,9 +1389,15 @@ export default function Dashboard() {
           color: #d4d4d8;
           background: #222227;
         }
+        .icon-button.loading {
+          opacity: 0.85;
+        }
         .danger-button {
           color: #ff5a5a;
           background: #312022;
+        }
+        .spin {
+          animation: spin 900ms linear infinite;
         }
         .toast {
           padding: 12px 14px;
@@ -1766,6 +1839,18 @@ export default function Dashboard() {
           flex-direction: column;
           gap: 14px;
         }
+        .date-divider {
+          align-self: center;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: #1a1a1c;
+          border: 1px solid #2b2b31;
+          color: #a1a1aa;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
         .bubble {
           width: fit-content;
           max-width: min(75%, 720px);
@@ -1853,6 +1938,10 @@ export default function Dashboard() {
           color: #a1a1aa;
           font-size: 14px;
           font-weight: 700;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         @media (max-width: 1100px) {
           .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
