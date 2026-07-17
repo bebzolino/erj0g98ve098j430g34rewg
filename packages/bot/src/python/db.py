@@ -477,6 +477,18 @@ class Database:
                 )
             conn.commit()
 
+    async def create_notification(self, user_id: str, status: str) -> None:
+        await self.run(self._create_notification, user_id, status)
+
+    def _create_notification(self, user_id: str, status: str) -> None:
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'INSERT INTO "Notification" (id, "userId", "sentAt", status) VALUES (%s, %s, NOW(), %s)',
+                    (str(uuid.uuid4()), user_id, status),
+                )
+            conn.commit()
+
     async def update_member_status(self, user_id: str, status: str) -> None:
         await self.run(self._update_member_status, user_id, status)
 

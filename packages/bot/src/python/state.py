@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 
 import discord
+import aiohttp
 
 from ai_classifier import classify_reply
 from discord_runtime import OutreachClient
@@ -560,6 +561,7 @@ class BotState:
                 "info",
             )
         await self.db.log(f'Reply received from {username} ({user_id}): "{content}"', "info")
+        await self.db.create_notification(user_id, "sent")
         try:
             sent = await send_telegram_message(
                 config,
@@ -575,3 +577,28 @@ class BotState:
                 await self.db.log(f"Telegram notification sent for reply from {username} ({user_id}).", "success")
         except Exception as exc:
             await self.db.log(f"Telegram notification failed for reply from {username} ({user_id}): {exc}", "error")
+        webhook_url = str(config.get("webhookUrl") or "").strip()
+        if webhook_url:
+            try:
+                await self.send_webhook_alert(
+                    webhook_url,
+                    {
+                        "type": "reply",
+                        "userId": user_id,
+                        "username": username,
+                        "content": content,
+                        "accountId": account_id,
+                        "sentAt": utc_now().isoformat(),
+                    },
+                )
+                await self.db.log(f"Webhook alert sent for reply from {username} ({user_id}).", "success")
+            except Exception as exc:
+                await self.db.log(f"Webhook alert failed for reply from {username} ({user_id}): {exc}", "error")
+
+    async def send_webhook_alert(self, url: str, payload: dict) -> None:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=payload) as response:
+                if response.status >= 400:
+                    body = await response.text()
+                    raise RuntimeError(f"Webhook returned {response.status}: {body[:300]}")

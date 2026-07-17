@@ -169,6 +169,29 @@ interface StatusSnapshot {
   logs: LogEntry[];
 }
 
+interface MetricsSnapshot {
+  metrics: {
+    totalMembers: number;
+    reachedOutCount: number;
+    deliveryRate: number;
+    replyRate: number;
+    leadRate: number;
+    avgResponseTimeSec: number;
+    toxicCount: number;
+  };
+  statusDistribution: Record<string, number>;
+  interestDistribution: Record<string, number>;
+  sentimentDistribution: Record<string, number>;
+}
+
+interface AlertItem {
+  id: string;
+  userId: string;
+  username: string;
+  sentAt: string;
+  status: string;
+}
+
 async function safeFetch<T>(url: string, fallback: T): Promise<T> {
   try {
     const res = await fetch(url);
@@ -233,6 +256,8 @@ export default function Dashboard() {
   const [proxies, setProxies] = useState<ProxyEntry[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [statusData, setStatusData] = useState<StatusSnapshot | null>(null);
+  const [metricsData, setMetricsData] = useState<MetricsSnapshot | null>(null);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [newAccountToken, setNewAccountToken] = useState('');
@@ -243,6 +268,7 @@ export default function Dashboard() {
   const [newProxyLabel, setNewProxyLabel] = useState('');
   const [newProxyType, setNewProxyType] = useState<'socks5' | 'http'>('socks5');
   const [newProxyUrl, setNewProxyUrl] = useState('');
+  const [proxyTests, setProxyTests] = useState<Record<string, { status: 'online' | 'failed'; detail?: string; error?: string; latencyMs?: number }>>({});
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [isEditingConfig, setIsEditingConfig] = useState(false);
@@ -263,6 +289,7 @@ export default function Dashboard() {
     [accounts],
   );
   const selectedAccount = selectedMember?.assignedAccountId ? accountById.get(selectedMember.assignedAccountId) ?? null : null;
+  const failedGreetingCount = (metricsData?.statusDistribution.failed_dm || 0) + (metricsData?.statusDistribution.failed_followup || 0);
 
   const stats = useMemo(() => {
     const delivered = members.filter((member) => ['first_dm_sent', 'replied', 'pinged', 'stopped'].includes(member.status)).length;
@@ -282,7 +309,7 @@ export default function Dashboard() {
   const loadData = async () => {
     setIsRefreshing(true);
     try {
-      const [configData, membersData, accountsData, blacklistData, proxyData, logsData, statusSnapshot] = await Promise.all([
+      const [configData, membersData, accountsData, blacklistData, proxyData, logsData, statusSnapshot, metricsSnapshot, alertsSnapshot] = await Promise.all([
         safeFetch<SystemConfig | null>('/api/config', null),
         safeFetch<Member[]>('/api/members', []),
         safeFetch<Account[]>('/api/accounts', []),
@@ -290,6 +317,8 @@ export default function Dashboard() {
         safeFetch<ProxyPayload>('/api/proxies', { proxies: [], accounts: [] }),
         safeFetch<LogEntry[]>('/api/logs', []),
         safeFetch<StatusSnapshot | null>('/api/status', null),
+        safeFetch<MetricsSnapshot | null>('/api/metrics', null),
+        safeFetch<{ notifications: AlertItem[] }>('/api/notifications', { notifications: [] }),
       ]);
 
       if (!isEditingConfig && configData && !('error' in configData)) setConfig(configData);
@@ -299,6 +328,8 @@ export default function Dashboard() {
       setProxies(Array.isArray(proxyData.proxies) ? proxyData.proxies : []);
       setLogs(Array.isArray(logsData) ? logsData : []);
       if (statusSnapshot && !('error' in statusSnapshot)) setStatusData(statusSnapshot);
+      if (metricsSnapshot && !('error' in metricsSnapshot)) setMetricsData(metricsSnapshot);
+      setAlerts(Array.isArray(alertsSnapshot.notifications) ? alertsSnapshot.notifications : []);
     } finally {
       setIsRefreshing(false);
     }
@@ -500,6 +531,29 @@ export default function Dashboard() {
     showNotice('Proxy added');
   };
 
+  const testProxy = async (proxy: ProxyEntry) => {
+    const res = await fetch('/api/proxies/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: proxy.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok && data.status !== 'failed') {
+      showError(data.error || 'Proxy test failed');
+      return;
+    }
+    setProxyTests((current) => ({
+      ...current,
+      [proxy.id]: {
+        status: data.status,
+        detail: data.detail,
+        error: data.error,
+        latencyMs: data.latencyMs,
+      },
+    }));
+    showNotice(data.status === 'online' ? `Proxy test passed in ${data.latencyMs}ms` : `Proxy test failed: ${data.error}`);
+  };
+
   const updateProxyAccounts = async (proxyId: string, accountIds: string[]) => {
     const res = await fetch('/api/proxies', {
       method: 'PATCH',
@@ -694,6 +748,35 @@ export default function Dashboard() {
 
           {activeTab === 'overview' && (
             <section className="view-stack">
+              {metricsData && (
+                <div className="stats-grid">
+                  <div className="stat-card">
+                    <span>Replies</span>
+                    <strong>{metricsData.metrics.replyRate}%</strong>
+                    <small>{metricsData.metrics.reachedOutCount} reached out</small>
+                  </div>
+                  <div className="stat-card">
+                    <span>Delivery</span>
+                    <strong>{metricsData.metrics.deliveryRate}%</strong>
+                    <small>{metricsData.metrics.totalMembers} members</small>
+                  </div>
+                  <div className="stat-card">
+                    <span>Failed greetings</span>
+                    <strong>{failedGreetingCount}</strong>
+                    <small>initial + second</small>
+                  </div>
+                  <div className="stat-card">
+                    <span>Response time</span>
+                    <strong>{metricsData.metrics.avgResponseTimeSec}s</strong>
+                    <small>avg reply gap</small>
+                  </div>
+                  <div className="stat-card">
+                    <span>Toxic</span>
+                    <strong>{metricsData.metrics.toxicCount}</strong>
+                    <small>flagged members</small>
+                  </div>
+                </div>
+              )}
               <div className="stats-grid">
                 {stats.map((stat) => (
                   <div className="stat-card" key={stat.label}>
@@ -708,7 +791,7 @@ export default function Dashboard() {
                 <div className="panel-header">
                   <div>
                     <h2>Overview Console</h2>
-                    <p>Join stream, greeting queue, delivery status, and safety events.</p>
+                    <p>Joins, replies, follow-ups, proxy checks, and safety events.</p>
                   </div>
                   <button className="secondary-button" type="button" onClick={clearLogs}>
                     Clear
@@ -724,6 +807,25 @@ export default function Dashboard() {
                     </div>
                   ))}
                   <div ref={logEndRef} />
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="panel-header compact">
+                  <div>
+                    <h2>Alerts</h2>
+                    <p>Recent replies and notifications from the bot.</p>
+                  </div>
+                </div>
+                <div className="alert-list">
+                  {alerts.length === 0 && <div className="empty-state">No alerts yet.</div>}
+                  {alerts.map((alert) => (
+                    <div className="alert-row" key={alert.id}>
+                      <span className="alert-time">[{formatTime(alert.sentAt)}]</span>
+                      <span className="alert-user">{alert.username}</span>
+                      <span className={`alert-status ${alert.status}`}>{alert.status}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
@@ -801,7 +903,9 @@ export default function Dashboard() {
                     >
                       <div>
                         <strong>{member.username}</strong>
-                        <span>{formatTime(member.joinTime)}</span>
+                        <span>
+                          {formatTime(member.joinTime)}{member.assignedAccountId ? ` · ${accountById.get(member.assignedAccountId)?.username || member.assignedAccountId}` : ''}
+                        </span>
                       </div>
                       <small className={`member-status ${member.status}`}>{statusLabel(member.status)}</small>
                     </button>
@@ -820,6 +924,13 @@ export default function Dashboard() {
                           <span> Join </span>
                           <strong>{formatTime(selectedMember.joinTime)}</strong>
                         </p>
+                        {(selectedMember.status === 'failed_followup' || selectedMember.status === 'failed_dm') && (
+                          <div className="member-failure-banner">
+                            {selectedMember.status === 'failed_followup'
+                              ? 'Second greeting failed.'
+                              : 'Initial greeting failed.'}
+                          </div>
+                        )}
                       </div>
                       <div className="chat-actions">
                         <button type="button" onClick={() => clearConversation(selectedMember.userId)}>Clear thread</button>
@@ -948,6 +1059,7 @@ export default function Dashboard() {
                 {proxies.length === 0 && <div className="panel empty-state">No proxies configured.</div>}
                 {proxies.map((proxy) => {
                   const assignedIds = accountsForProxy(proxy.id).map((account) => account.id);
+                  const test = proxyTests[proxy.id];
                   return (
                     <div className="account-card proxy-card" key={proxy.id}>
                       <div className="avatar">P</div>
@@ -955,6 +1067,14 @@ export default function Dashboard() {
                         <strong>{proxy.label || 'Proxy'}</strong>
                         <span>{(proxy.type || 'http').toUpperCase()}</span>
                         <span>{proxy.urlPreview}</span>
+                        <div className="proxy-test-row">
+                          <button className="secondary-button compact" type="button" onClick={() => testProxy(proxy)}>
+                            Test
+                          </button>
+                          <span className={`proxy-test-status ${test?.status || ''}`}>
+                            {test ? (test.status === 'online' ? `Online${test.latencyMs ? ` · ${test.latencyMs}ms` : ''}` : `Failed · ${test.error || 'unreachable'}`) : 'Not tested'}
+                          </span>
+                        </div>
                         <div className="proxy-assignment-header">
                           <span>{assignedIds.length} assigned</span>
                           <button
@@ -1483,6 +1603,46 @@ export default function Dashboard() {
           font-size: 13px;
           line-height: 1.8;
         }
+        .alert-list {
+          display: grid;
+          gap: 10px;
+        }
+        .alert-row {
+          display: grid;
+          grid-template-columns: 88px minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: center;
+          padding: 12px 0;
+          border-top: 1px solid #2b2b31;
+          font-size: 13px;
+        }
+        .alert-row:first-child {
+          border-top: 0;
+          padding-top: 0;
+        }
+        .alert-time {
+          color: #71717a;
+          font-family: Consolas, monospace;
+        }
+        .alert-user {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-weight: 800;
+        }
+        .alert-status {
+          padding: 5px 9px;
+          border-radius: 999px;
+          background: rgba(96, 165, 250, 0.12);
+          color: #60a5fa;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .alert-status.failed {
+          color: #ff5a5a;
+          background: rgba(255, 90, 90, 0.14);
+        }
         .log-row {
           display: grid;
           grid-template-columns: 82px 76px 1fr;
@@ -1674,6 +1834,24 @@ export default function Dashboard() {
           height: 15px;
           accent-color: #ff5a5a;
         }
+        .proxy-test-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 10px;
+          flex-wrap: wrap;
+        }
+        .proxy-test-status {
+          color: #a1a1aa;
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .proxy-test-status.online {
+          color: #03c880;
+        }
+        .proxy-test-status.failed {
+          color: #ff5a5a;
+        }
         .variant-list {
           display: grid;
           gap: 10px;
@@ -1819,9 +1997,19 @@ export default function Dashboard() {
           border-bottom: 1px solid #2b2b31;
           margin-bottom: 0;
         }
+        .member-failure-banner {
+          margin-top: 10px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(255, 90, 90, 0.14);
+          color: #ff5a5a;
+          font-size: 13px;
+          font-weight: 800;
+        }
         .chat-actions {
           display: flex;
           gap: 10px;
+          flex-wrap: wrap;
         }
         .chat-actions button {
           border: 1px solid #2b2b31;
