@@ -43,6 +43,7 @@ class BotState:
         self.primary_account_id: str | None = None
         self.tasks: dict[str, asyncio.Task[None]] = {}
         self.last_runtime_summary = ""
+        self.paused = False
 
     def is_primary(self, account_id: str) -> bool:
         return self.primary_account_id == account_id
@@ -53,6 +54,8 @@ class BotState:
         asyncio.create_task(self.account_sync_loop())
 
     async def start_clients(self) -> None:
+        if self.paused:
+            return
         accounts = await self.db.fetch_accounts((STATUS_ACTIVE,))
         active_ids = {account["id"] for account in accounts}
         for account_id, client in list(self.clients.items()):
@@ -138,11 +141,35 @@ class BotState:
     async def queue_loop(self) -> None:
         while True:
             try:
-                await self.scan_queue()
+                if not self.paused:
+                    await self.scan_queue()
             except Exception:
                 logging.exception("QUEUE_SCAN_FAILED")
             config = await self.db.fetch_config()
             await asyncio.sleep(max(1, positive_int(config.get("queueScanIntervalSeconds"), 60)))
+
+    async def pause_runtime(self) -> None:
+        self.paused = True
+        for key, task in list(self.tasks.items()):
+            task.cancel()
+            self.tasks.pop(key, None)
+        for account_id in list(self.clients.keys()):
+            await self.stop_client(account_id, "runtime was stopped from the dashboard")
+        await self.db.log("Bot runtime stopped from dashboard console.", "warn")
+
+    async def resume_runtime(self) -> None:
+        if not self.paused and self.clients:
+            await self.db.log("Bot runtime start requested, but it is already running.", "info")
+            return
+        self.paused = False
+        await self.db.log("Bot runtime starting from dashboard console.", "info")
+        await self.start_clients()
+
+    async def restart_runtime(self) -> None:
+        await self.pause_runtime()
+        await asyncio.sleep(1)
+        await self.resume_runtime()
+        await self.db.log("Bot runtime restarted from dashboard console.", "success")
 
     async def scan_queue(self) -> None:
         config = await self.db.fetch_config()

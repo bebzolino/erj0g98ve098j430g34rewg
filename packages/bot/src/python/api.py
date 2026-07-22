@@ -60,6 +60,15 @@ def create_app(state) -> web.Application:
         if action == "trigger_custom_dm":
             ok = await state.send_dm(user_id, message, MEMBER_FIRST_DM_SENT, MEMBER_FAILED_DM, "Custom DM")
             return web.json_response({"success": ok}, status=200 if ok else 500)
+        if action == "runtime_start":
+            await state.resume_runtime()
+            return web.json_response({"success": True, "status": "started"})
+        if action == "runtime_stop":
+            await state.pause_runtime()
+            return web.json_response({"success": True, "status": "stopped"})
+        if action == "runtime_restart":
+            await state.restart_runtime()
+            return web.json_response({"success": True, "status": "restarted"})
         return web.json_response({"error": "Unknown action"}, status=400)
 
     app.router.add_get("/", handle_health)

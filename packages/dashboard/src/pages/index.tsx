@@ -9,9 +9,12 @@ import {
   LogOut,
   MessageSquare,
   Plus,
+  Play,
   RefreshCw,
+  RotateCcw,
   Settings,
   Shield,
+  Square,
   Trash2,
   Users,
   Wifi,
@@ -273,6 +276,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [botControlBusy, setBotControlBusy] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -598,6 +602,25 @@ export default function Dashboard() {
     showNotice('Logs cleared');
   };
 
+  const controlBot = async (action: 'runtime_start' | 'runtime_stop' | 'runtime_restart') => {
+    setBotControlBusy(action);
+    const res = await fetch('/api/bot-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBotControlBusy('');
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'Bot control failed');
+      return;
+    }
+
+    await loadData();
+    showNotice(`Bot ${data.status || action.replace('runtime_', '')}`);
+  };
+
   const clearConversation = async (userId: string) => {
     const res = await fetch(`/api/conversations?userId=${encodeURIComponent(userId)}`, {
       method: 'DELETE',
@@ -793,9 +816,23 @@ export default function Dashboard() {
                     <h2>Overview Console</h2>
                     <p>Joins, replies, follow-ups, proxy checks, and safety events.</p>
                   </div>
-                  <button className="secondary-button" type="button" onClick={clearLogs}>
-                    Clear
-                  </button>
+                  <div className="console-actions">
+                    <button className="secondary-button compact" type="button" onClick={() => controlBot('runtime_start')} disabled={Boolean(botControlBusy)}>
+                      <Play size={14} />
+                      Start
+                    </button>
+                    <button className="secondary-button compact danger-lite" type="button" onClick={() => controlBot('runtime_stop')} disabled={Boolean(botControlBusy)}>
+                      <Square size={14} />
+                      Stop
+                    </button>
+                    <button className="secondary-button compact" type="button" onClick={() => controlBot('runtime_restart')} disabled={Boolean(botControlBusy)}>
+                      <RotateCcw size={14} className={botControlBusy === 'runtime_restart' ? 'spin' : ''} />
+                      Restart
+                    </button>
+                    <button className="secondary-button compact" type="button" onClick={clearLogs}>
+                      Clear
+                    </button>
+                  </div>
                 </div>
                 <div className="log-list">
                   {logs.length === 0 && <div className="empty-state">No logs yet.</div>}
@@ -1680,13 +1717,31 @@ export default function Dashboard() {
           font-weight: 800;
         }
         .secondary-button.compact {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
           min-height: 32px;
           padding: 7px 11px;
           font-size: 12px;
         }
+        .secondary-button.danger-lite {
+          color: #ff8b8b;
+        }
+        .secondary-button:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
         .secondary-button:hover {
           color: #fff;
           border-color: #3a3a40;
+        }
+        .console-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
         }
         .form-grid {
           display: grid;
